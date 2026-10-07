@@ -1,6 +1,11 @@
 {
   "name": "strat-trade-review",
-  "owner": { "name": "345 Strategies" },
+  "owner": {
+    "name": "345 Strategies"
+  },
+  "metadata": {
+    "description": "TheStrat trade review for options, shares and futures, by 345 Strategies."
+  },
   "plugins": [
     {
       "name": "strat-trade-review",
