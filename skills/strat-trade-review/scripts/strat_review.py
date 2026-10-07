@@ -194,16 +194,25 @@ def load_bars(path: str) -> list[Bar]:
     return bars
 
 
-def fetch_yfinance(symbol: str, day: date, interval: str, out: Path) -> Path:
+def fetch_yfinance(symbol: str, day: date, interval: str, out: Path, strict: bool = True,
+                   days_back: int = 6) -> Path | None:
+    def fail(msg):
+        if strict:
+            sys.exit(msg)
+        print(f"note: {msg}", file=sys.stderr)
+        return None
     try:
         import yfinance as yf  # noqa: WPS433
     except ImportError:
-        sys.exit("yfinance is not installed: python3 -m pip install yfinance (or pass --bars)")
-    df = yf.download(symbol, start=day - timedelta(days=6), end=day + timedelta(days=1),
-                     interval=interval, prepost=False, progress=False, auto_adjust=False)
+        return fail("yfinance is not installed: python3 -m pip install yfinance (or pass --bars)")
+    try:
+        df = yf.download(symbol, start=day - timedelta(days=days_back), end=day + timedelta(days=1),
+                         interval=interval, prepost=False, progress=False, auto_adjust=False)
+    except Exception as e:  # network, rate limit
+        return fail(f"yfinance download failed for {symbol}: {e}")
     if df is None or df.empty:
-        sys.exit(f"yfinance returned no {interval} bars for {symbol} around {day}. "
-                 "1m data only reaches back ~30 days and 5m/15m ~60 days.")
+        return fail(f"yfinance returned no {interval} bars for {symbol} around {day}. "
+                    "1m data only reaches back ~30 days and 5m/15m ~60 days.")
     if hasattr(df.columns, "levels"):
         df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
     with out.open("w", newline="") as f:
@@ -212,6 +221,40 @@ def fetch_yfinance(symbol: str, day: date, interval: str, out: Path) -> Path:
         for ts, r in df.iterrows():
             w.writerow([ts.isoformat(), r["Open"], r["High"], r["Low"], r["Close"]])
     return out
+
+
+YF_FUTURES = {"ES": "ES=F", "MES": "ES=F", "NQ": "NQ=F", "MNQ": "NQ=F", "RTY": "RTY=F", "M2K": "RTY=F",
+              "YM": "YM=F", "MYM": "YM=F", "CL": "CL=F", "MCL": "CL=F", "GC": "GC=F", "MGC": "GC=F",
+              "SI": "SI=F", "SIL": "SI=F"}
+
+
+def ensure_context(bars, daily, positions, sess, args, out: Path):
+    """Fill in what the Strat state needs when the given bars stop short: the previous session's
+    intraday bars and a few prior daily bars. Tries yfinance; otherwise the review notes the gap."""
+    first = min(p.fills[0].time for p in positions)
+    s0 = sess.start_of(first)
+    has_prior = any(sess.start_of(b.start) < s0 and sess.contains(b.start) for b in bars)
+    if has_prior and daily:
+        return bars, daily
+    inst = positions[0].inst
+    sym = args.yf_symbol or (YF_FUTURES.get(inst.underlying, f"{inst.underlying}=F") if inst.asset == "future"
+                             else inst.underlying)
+    day = first.astimezone(ET).date()
+    if not has_prior:
+        step = min(((b.end - b.start) for b in bars), default=timedelta(minutes=5))
+        interval = "1m" if step <= timedelta(minutes=1) else "5m"
+        p = fetch_yfinance(sym, day, interval, out / f"context_{sym.replace('=', '_')}_{interval}.csv", strict=False)
+        if p:
+            extra = [b for b in load_bars(str(p)) if b.start < bars[0].start]
+            if extra:
+                bars = extra + bars
+                print(f"Added {len(extra)} prior-session {interval} bars for {sym} from Yahoo Finance.", file=sys.stderr)
+    if not daily:
+        p = fetch_yfinance(sym, day, "1d", out / f"context_{sym.replace('=', '_')}_1d.csv", strict=False, days_back=10)
+        if p:
+            daily = load_bars(str(p))
+            print(f"Added {len(daily)} daily bars for {sym} from Yahoo Finance.", file=sys.stderr)
+    return bars, daily
 
 
 # ----------------------------------------------------------------------------- instruments
@@ -591,9 +634,11 @@ def session_triggers(bars, tf, sess, daily_hist, session_start) -> list[dict]:
                     if (m > lvl) if bull else (m < lvl):
                         mag = m
                 combo = (f"{c2tok}-1-{d}" if c1tok == "1" else f"{c1tok}-{d}")
+                # opened through the level: there was never a fill at the trigger price
+                gap = b.start == cc.start and ((b.open > lvl) if bull else (b.open < lvl))
                 events.append(dict(tf=tf, time=b.start, bar_start=cc.start, dir="BULL" if bull else "BEAR",
                                    combo=combo, family=family(c2tok, c1tok, d), trigger=lvl, stop_c1=stop,
-                                   magnitude=mag))
+                                   magnitude=mag, gap=gap))
     return events
 
 
@@ -806,6 +851,9 @@ def run(args):
     else:
         o, c = (args.session_hours or "09:30-16:00").split("-")
         sess = SessionSpec(time.fromisoformat(o), time.fromisoformat(c), False)
+    # full context: the prior session's intraday bars (C1/C2 for the day's first bars) and prior daily bars
+    if not args.no_auto_context:
+        bars, daily = ensure_context(bars, daily, positions, sess, args, out)
     tfs = [t.strip() for t in args.tfs.split(",") if t.strip()]            # vote on continuity and flags
     ctx_tfs = [t.strip() for t in args.context_tfs.split(",") if t.strip() and t.strip() not in tfs]
     show_tfs = tfs + ctx_tfs                                                  # shown, context only
@@ -824,6 +872,9 @@ def run(args):
             continue
         for f in pos.fills:
             f.und = und_at_fill(bars, f.time)
+        if not any(sess.start_of(b.start) < s0 and sess.contains(b.start) for b in bars):
+            md.append("_No bars from the prior session: the first bars of each timeframe show `?` because there is "
+                      "no prior bar to compare them with. Add the previous session's bars to resolve them._\n")
         pricer = Pricer(inst, bars, [c for c in cbars], pos, sess)
         day_pnl_path.append((pos, pricer))
         bull = pos.direction == "BULL"
@@ -942,7 +993,7 @@ def run(args):
                     alts.append((f"Your exits on {q - half:g}, {half:g} runners to {clock.fmt(mark_t)}",
                                  cost_all + exit_val(q - half, ax) + exit_val(half, mark_px), pricer.source))
         # clean Strat entry: the first --entry-tf trigger in the trade's direction
-        cand_ev = [e for e in all_events if e["tf"] == args.entry_tf and e["dir"] == pos.direction]
+        cand_ev = [e for e in all_events if e["tf"] == args.entry_tf and e["dir"] == pos.direction and not e["gap"]]
         if args.clean_entry:
             ct = parse_time(args.clean_entry)
             cand_ev = [e for e in cand_ev if e["time"] >= ct - timedelta(minutes=1)]
@@ -1069,7 +1120,7 @@ def run(args):
             md.append(f"| {clock.fmt(e['time'])} | {e['tf']} | {e['dir']}{mark} | {e['combo']} | {e['family']} | "
                       f"{e['trigger']:.2f} | {e['stop_c1']:.2f} | "
                       f"{'-' if e['target'] is None else format(e['target'], '.2f')} | "
-                      f"{e['result']} | {e['mfe_r']:.1f} |")
+                      f"{'gapped through, no fill at the trigger' if e['gap'] else e['result']} | {e['mfe_r']:.1f} |")
         md.append("")
         md.append("### Reference levels\n")
         for k, v in levels.items():
@@ -1107,7 +1158,11 @@ def run(args):
                        "stopped": e["stopped"].isoformat() if e["stopped"] else None} for e in all_events],
             levels=levels, hod=hod.high, lod=lod.low, t1=t1,
             alternatives=[dict(plan=a, pnl=v, source=s) for a, v, s in alts],
-            delta=dlt, clean=None if not clean else {k: (v if k != "event" else v["combo"]) for k, v in clean.items()},
+            delta=dlt, clean=None if not clean else {**{k: (v if k != "event" else v["combo"]) for k, v in clean.items()},
+                                                      "tf": clean["event"]["tf"], "time": clean["event"]["time"].isoformat(),
+                                                      "trigger": clean["event"]["trigger"],
+                                                      "stop_c1": clean["event"]["stop_c1"]},
+            cost=sum(abs(pos.net(f)) for f in entries), tfs=tfs,
         ))
         if args.chart:
             cpath = out / f"chart_{pi}_{re.sub(r'[^A-Za-z0-9]+', '_', inst.label())}.png"
@@ -1117,6 +1172,15 @@ def run(args):
                       clean, clock, sess, args.chart_tf, bars, daily, args.candles)
             except ImportError:
                 md.append("_Chart skipped: matplotlib not installed._\n")
+            else:
+                mpath = out / f"timeframes_{pi}_{re.sub(r'[^A-Za-z0-9]+', '_', inst.label())}.png"
+                cost = sum(abs(pos.net(f)) for f in entries)
+                extra = (f"{pos.direction}  ·  net {money(actual)}"
+                         + (f" ({actual / cost:+.0%} on {money(cost).lstrip('-+')} paid)"
+                            if cost and inst.asset != "future" else "")
+                         + (f"  ·  {', '.join(flags)}" if flags else ""))
+                mtf_chart(mpath, bars, sess, s0, pos, fill_states, all_events, clean, clock, tfs, ctx_tfs, extra)
+                report["positions"][-1]["timeframes_chart"] = mpath.name
 
     # whole-day P/L curve across every position (for daily loss limits)
     day_worst = None
@@ -1240,6 +1304,152 @@ def chart(path, sbars, pos, levels, clean, clock, sess, chart_tf, all_bars, dail
     plt.close(fig)
 
 
+def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs, ctx_tfs, title_extra=""):
+    """One image: a panel per timeframe (5m, 15m, 30m, 60m by default) with every fill numbered on it,
+    the triggers near the trade, the clean Strat entry and its C1 stop, and a table of the state on
+    each timeframe at each fill. Plain candles (green bull, red bear) with the bar type underneath."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.gridspec import GridSpec
+    matplotlib.rcParams["text.parse_math"] = False   # dollar signs are text, not math
+
+    BG, FG, MUTED, GRID = "#0f0f0f", "#e6e6e6", "#8a8a8a", "#2a2a2a"
+    BULL_C, BEAR_C = SUITE_COLORS["2u"], SUITE_COLORS["2d"]
+    fills = [f for f, _, _ in fill_states]
+    first_t, last_t = fills[0].time, fills[-1].time
+    rows = len(fill_states)
+    fig = plt.figure(figsize=(16, 10.5 + 0.32 * max(0, rows - 4)), dpi=110)
+    fig.patch.set_facecolor(BG)
+    gs = GridSpec(3, 2, figure=fig, height_ratios=[1, 1, 0.3 + 0.08 * rows], hspace=0.3, wspace=0.12,
+                  left=0.05, right=0.97, top=0.9, bottom=0.03)
+    fig.text(0.05, 0.965, f"{pos.inst.label()}  ·  {first_t.astimezone(ET):%a %b %-d, %Y}", color=FG,
+             fontsize=17, weight="bold", va="center")
+    if title_extra:
+        fig.text(0.05, 0.935, title_extra, color=MUTED, fontsize=11, va="center")
+    fig.text(0.97, 0.965, "#n = fill number (blue ▲ buy, white ▼ sell). Candles: green bull, red bear; "
+             "bar type under each.", color=MUTED, fontsize=9, ha="right", va="center")
+
+    for k, tf in enumerate(tfs[:4]):
+        ax = fig.add_subplot(gs[k // 2, k % 2])
+        ax.set_facecolor(BG)
+        agg = aggregate(bars, tf, sess)
+        idx0 = next((i for i, b in enumerate(agg) if sess.start_of(b.start) == s0), None)
+        if idx0 is None:
+            continue
+        sb = [b for b in agg if sess.start_of(b.start) == s0]
+        prev0 = agg[idx0 - 1] if idx0 > 0 else None
+        step = timedelta(minutes=TF_MIN[tf])
+        lo_t, hi_t = sb[0].start, sb[-1].start + step
+        if len(sb) > 40:   # zoom the fast timeframe to the trade
+            lo_t = max(lo_t, first_t - 12 * step)
+            hi_t = min(hi_t, last_t + 18 * step)
+        view = [(i, b) for i, b in enumerate(sb) if lo_t <= b.start < hi_t]
+        for j, (i, b) in enumerate(view):
+            prev = sb[i - 1] if i > 0 else prev0
+            col = BULL_C if above_open(b) else BEAR_C
+            ax.vlines(j, b.low, b.high, color=col, linewidth=1)
+            ax.add_patch(plt.Rectangle((j - 0.33, min(b.open, b.close)), 0.66,
+                                       max(abs(b.close - b.open), 1e-6), facecolor=col, edgecolor=col))
+            kind = token(b, prev) if prev else "?"
+            kind = kind.rstrip("ud") if kind[0] in "13" else kind
+            ax.annotate(kind, (j, b.low), textcoords="offset points", xytext=(0, -9), ha="center",
+                        color=MUTED, fontsize=6.5)
+
+        def x_of(t):
+            for j, (i, b) in enumerate(view):
+                if b.start <= t < b.start + step:
+                    return j
+            return None
+
+        # the first trigger with the trade on this timeframe once the trade is on (not a gap-through)
+        is_clean_tf = bool(clean) and clean["event"]["tf"] == tf
+        if not is_clean_tf:
+            nxt = [e for e in events if e["tf"] == tf and not e.get("gap") and e["dir"] == pos.direction
+                   and e["time"] >= first_t - step]
+            if nxt:
+                e = nxt[0]
+                j = x_of(e["time"])
+                if j is not None:
+                    c = BULL_C if e["dir"] == "BULL" else BEAR_C
+                    ax.hlines(e["trigger"], j - 0.45, len(view) - 0.5, color=c, linewidth=1.2, alpha=0.9)
+                    ax.annotate(f"{tf} trigger {e['combo']} {e['trigger']:.2f}, "
+                                f"{clock.fmt(e['time']).split(' (')[0]}", (len(view) - 0.5, e["trigger"]),
+                                textcoords="offset points", xytext=(-2, 4), ha="right", color=c, fontsize=8)
+        if clean and clean["event"]["tf"] == tf:
+            e = clean["event"]
+            j = x_of(e["time"])
+            if j is not None:
+                c = BULL_C if e["dir"] == "BULL" else BEAR_C
+                ax.hlines(e["trigger"], j - 0.45, len(view) - 0.5, color=c, linewidth=1.8)
+                ax.hlines(e["stop_c1"], j - 1.45, len(view) - 0.5, color=MUTED, linewidth=1, linestyle="--")
+                ax.annotate(f"Strat entry: {e['combo']} {e['trigger']:.2f}, {clock.fmt(e['time']).split(' (')[0]}",
+                            (len(view) - 0.5, e["trigger"]), textcoords="offset points", xytext=(-2, 4),
+                            ha="right", color=c, fontsize=8, weight="bold")
+                ax.annotate(f"C1 stop {e['stop_c1']:.2f}", (len(view) - 0.5, e["stop_c1"]),
+                            textcoords="offset points", xytext=(-2, -10), ha="right", color=MUTED, fontsize=7.5)
+
+        groups: dict = {}
+        for n, f in enumerate(fills, 1):   # one marker per bar and side, numbered by fill order
+            j = x_of(f.time)
+            if j is not None and f.und is not None:
+                groups.setdefault((j, f.sign), []).append((n, f))
+        for (j, sign), nf in groups.items():
+            buy = sign > 0
+            y = sum(f.und for _, f in nf) / len(nf)
+            ax.scatter(j, y, marker="^" if buy else "v", s=80, color="#2962ff" if buy else "#ffffff",
+                       edgecolors="#000000", zorder=6)
+            ax.annotate("#" + ",".join(str(n) for n, _ in nf), (j, y), textcoords="offset points",
+                        xytext=(0, -17 if buy else 10), ha="center", color="#0f0f0f", fontsize=7.5,
+                        weight="bold", zorder=7,
+                        bbox=dict(boxstyle="round,pad=0.2", fc="#2962ff" if buy else "#ffffff", ec="none"))
+        st0 = fill_states[0][1].get(tf, {})
+        sign = st0.get("sign")
+        ax.set_title(tf, loc="left", color=FG, fontsize=12, weight="bold")
+        ax.set_title(f"at fill 1: {st0.get('combo', '-')}"
+                     + ("" if sign is None else ("  above open" if sign else "  below open")),
+                     loc="right", fontsize=9, color=MUTED if sign is None else (BULL_C if sign else BEAR_C))
+        n_ticks = 6
+        stp = max(1, len(view) // n_ticks)
+        ax.set_xticks(range(0, len(view), stp))
+        ax.set_xticklabels([clock.fmt(view[j][1].start).split(" (")[0] for j in range(0, len(view), stp)],
+                           fontsize=7.5, color=MUTED)
+        ax.tick_params(axis="y", colors=MUTED, labelsize=7.5)
+        ax.grid(axis="y", color=GRID, linewidth=0.5)
+        ax.set_xlim(-1, len(view))
+        for sp in ax.spines.values():
+            sp.set_color(GRID)
+
+    # state at each fill on every timeframe
+    tab = fig.add_subplot(gs[2, :])
+    tab.set_axis_off()
+    cols = tfs + ctx_tfs
+    head = ["#", "Fill"] + [c + (" (context)" if c in ctx_tfs else "") for c in cols] + ["Continuity"]
+    xs_col = [0.0, 0.03] + [0.3 + 0.115 * i for i in range(len(cols))] + [0.3 + 0.115 * len(cols)]
+    y = 0.92
+    for x, h in zip(xs_col, head):
+        tab.text(x, y, h, color=MUTED, fontsize=9, transform=tab.transAxes, va="top")
+    for n, (f, st, cont) in enumerate(fill_states, 1):
+        y -= 0.78 / (rows + 1)
+        side = "BUY" if f.sign > 0 else "SELL"
+        tab.text(xs_col[0], y, str(n), color=FG, fontsize=9.5, weight="bold", transform=tab.transAxes, va="top")
+        tab.text(xs_col[1], y, f"{clock.fmt(f.time)}  {side} {f.qty:g} @ {f.price:g}"
+                 + (f"  ({pos.inst.underlying} {f.und:.2f})" if f.und else ""),
+                 color=FG, fontsize=9, transform=tab.transAxes, va="top")
+        for i, c in enumerate(cols):
+            s_ = st.get(c, {})
+            sg = s_.get("sign")
+            tab.text(xs_col[2 + i], y, s_.get("combo", "-") + ("" if sg is None else (" ↑" if sg else " ↓")),
+                     color=FG if sg is None else (BULL_C if sg else BEAR_C), fontsize=9, family="monospace",
+                     transform=tab.transAxes, va="top")
+        tab.text(xs_col[-1], y, cont, color=FG, fontsize=9, transform=tab.transAxes, va="top")
+    tab.text(0, 0.0, "↑ / ↓: the forming bar is above / below its open at the fill (only bars closed by then are "
+             "used). ? = no prior bar to compare (load the prior session). Not advice.",
+             color=MUTED, fontsize=8, transform=tab.transAxes, va="bottom")
+    fig.savefig(path, facecolor=BG)
+    plt.close(fig)
+
+
 # ----------------------------------------------------------------------------- cli
 
 def main(argv=None):
@@ -1252,6 +1462,8 @@ def main(argv=None):
     ap.add_argument("--daily", help="Daily bars for prior days (for the Day timeframe's C1/C2 and prior close)")
     ap.add_argument("--contract-bars", help="Intraday bars for the option contract itself (real marks)")
     ap.add_argument("--fetch", choices=["yfinance"], help="Download underlying bars instead of --bars")
+    ap.add_argument("--no-auto-context", action="store_true",
+                    help="Don't fill in missing prior-session or daily bars from Yahoo Finance")
     ap.add_argument("--yf-symbol", help="Yahoo symbol to fetch (e.g. SPY, ES=F, NQ=F)")
     ap.add_argument("--interval", default="5m", help="Fetch interval (1m or 5m)")
     ap.add_argument("--symbol", help="Only review positions on this symbol or underlying")

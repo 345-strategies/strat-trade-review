@@ -70,6 +70,8 @@ You need, for the trade's session:
 | The option contract's own intraday bars | real marks for alternatives and drawdown | optional; without it, option alternatives are Black-Scholes ESTIMATES |
 | Next-expiry contract, leveraged ETF bars | roll / shares comparisons | only if the trader asks about those |
 
+**Always get full context yourself; never ask the trader to.** The trade day alone is not enough: the first 5m, 15m, 30m and 60m bars of a day take their C1 and C2 from the previous session, and the Day needs prior daily bars. Pull the prior session and the daily bars from the same source as the trade day. The script also tries to fill in anything missing from Yahoo Finance on its own (`--no-auto-context` turns that off); if no source works, the review says so, the affected cells show `?`, and you tell the trader which states could not be resolved.
+
 Pick a source with `references/data-sources.md`, in this order:
 
 1. **A connected broker or TradingView tool.** Pull the bars yourself and save them to CSV or JSON; the script reads plain CSV, Public's `get_price_history` JSON, and TradingView `{t,o,h,l,c}` rows or columns.
@@ -107,7 +109,7 @@ Useful options:
 | `--triggers-window` | `3` | hours either side of the entry to list triggers (0 = whole session) |
 | `--fetch yfinance --yf-symbol ES=F --interval 1m` | off | download underlying bars instead of `--bars` |
 
-It writes `review.md` (tables), `review.json` (same data for you to read), and `chart_*.png`. Read `review.json` for exact values; do not re-derive them by hand.
+It writes `review.md` (tables), `review.json` (same data for you to read), `timeframes_*.png` and `chart_*.png`. **`timeframes_*.png` is the main image to show the trader**: one panel each for 5m, 15m, 30m and 60m with every fill numbered (`#1`, `#2`...), the first trigger with the trade on each timeframe, the clean Strat entry and its C1 stop, and a table of the state on every timeframe at every fill. `chart_*.png` is the single-timeframe session view. Read `review.json` for exact values; do not re-derive them by hand.
 
 What it computes, so you can explain it:
 
@@ -164,14 +166,22 @@ If the trader keeps a journal, write an entry from `assets/journal-entry-templat
 ## Step 6: Share it (when asked)
 
 ```bash
-python3 scripts/share_post.py --review review_out --lesson "Wait for the 30m trigger." [--r-only] [--handle @name]
+python3 scripts/share_post.py --review review_out --lesson "Wait for the 30m trigger." \
+  [--pro "..."] [--con "..."] [--no-dollars] [--handle @name]
 ```
 
-It writes `review_out/share/post.md` (under Discord's 2,000-character limit, no tables, since Discord does not render them; alternatives go in a code block), `card.png` (a 1200x675 summary card) and `chart.png`. Write the lesson yourself in one sentence, in the trader's words where you can. Show the post, attach both images, and tell them to paste the text and drop the two images into the same Discord message. Use `--r-only` when they would rather not show dollars; R travels better between account sizes anyway.
+It writes to `review_out/share/`:
+
+- `post.md`: the message, under Discord's 2,000-character limit, no tables (Discord does not render them; alternatives go in a code block).
+- `timeframes.png`: the 5m/15m/30m/60m view, the main image.
+- `card.png`: a 1200x675 summary card that leads with % return on what was paid (options and shares; R for futures), then R, then dollars, and lists what was **with the Strat** and **against the Strat**.
+- `chart.png`: the single-timeframe view.
+
+The with/against points are drafted from the review: continuity at each entry, a break that was failing (F2u/F2d) when taken, averaging down, selling on the clean trigger, the loss limit. Read them against your own review and replace any that are off with `--pro` / `--con` (each repeatable; passing either replaces all drafted points). Keep each to one line that names the fill and the timeframe. Write the lesson in one sentence, in the trader's words where you can. Tell the trader to paste the text and attach `timeframes.png` and `card.png` to the same Discord message. `--no-dollars` hides dollar amounts and keeps % and R.
 
 ## Pitfalls
 
-- **Missing prior session:** the first bars of the day show `?` for C1/C2. Fetch the previous session too.
+- **Missing prior session:** the first bars of the day show `?` for C1/C2. The script tries to fill it from Yahoo Finance; if that fails, fetch the previous session from the broker or TradingView and re-run.
 - **Futures:** sessions run 18:00 to 17:00 ET, so a fill at 8 PM belongs to the next trade date. Micros (MES, MNQ) trade the same price as the minis; multipliers are in the script and can be overridden with `--multiplier`.
 - **0DTE options** move far from Black-Scholes in the last hours. Use real contract bars whenever the alternatives are the point of the review.
 - **Partial-day reviews:** when the session is still open, every hold row is a mark. Re-run with `--mark` at the close later and say the numbers changed.

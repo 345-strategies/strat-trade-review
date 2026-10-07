@@ -4,7 +4,7 @@ Two skills in one kit: **strat-trade-review** reviews a day's trades against The
 
 Hand an AI assistant your fills and it reviews the trade the way a TheStrat trader would: where the entry sat against the 5m, 15m, 30m and 60m bars (with the daily for context), whether you were with or against continuity, where the real trigger was, how close you came to your daily loss limit, and what holding, a runner, scaling out at target or the clean trigger entry would actually have paid. Works for **options, shares and futures**, from **any broker**.
 
-![Example review chart](skills/strat-trade-review/examples/example-chart.png)
+![Example: 5m, 15m, 30m and 60m with every fill numbered](skills/strat-trade-review/examples/example-timeframes.png)
 
 ## What you need
 
@@ -33,9 +33,9 @@ Then ask: *"Review my SPY calls from today"* and attach your export. Or: *"How m
 - The day's worst point against your loss limit
 - Priced alternatives in dollars and R, labeled as real marks or estimates
 - A few questions about your plan and how the trade felt, so the review can confirm or correct your own read
-- A chart of the session with your fills marked: green candles bull, red bear, each bar's Strat type labeled underneath (`--candles strat` for Suite bar-type colors instead)
+- **A 5m / 15m / 30m / 60m image with every fill numbered**, the triggers, the clean Strat entry and its C1 stop, and the state on each timeframe at each fill (green candles bull, red bear, bar type labeled underneath)
 
-- A post ready for Discord (under the 2,000-character limit) with a summary card image and the chart, in dollars or R only
+- A post ready for Discord (under the 2,000-character limit) with the timeframe image and a summary card: % return and R, what was with and against the Strat, and the alternatives (dollars optional)
 
 ## Risk and mindset
 
