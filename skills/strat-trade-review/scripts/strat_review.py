@@ -1112,7 +1112,7 @@ def run(args):
         if args.chart:
             try:
                 chart(out / f"chart_{pi}_{re.sub(r'[^A-Za-z0-9]+', '_', inst.label())}.png", sbars, pos, levels,
-                      clean, clock, sess, args.chart_tf, bars, daily)
+                      clean, clock, sess, args.chart_tf, bars, daily, args.candles)
             except ImportError:
                 md.append("_Chart skipped: matplotlib not installed._\n")
 
@@ -1158,7 +1158,7 @@ def run(args):
 
 # ----------------------------------------------------------------------------- chart
 
-def chart(path, sbars, pos, levels, clean, clock, sess, chart_tf, all_bars, daily):
+def chart(path, sbars, pos, levels, clean, clock, sess, chart_tf, all_bars, daily, candles="plain"):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -1172,10 +1172,17 @@ def chart(path, sbars, pos, levels, clean, clock, sess, chart_tf, all_bars, dail
     xs = list(range(len(cb)))
     for i, b in enumerate(cb):
         tok = token(b, prev) if prev else ("1u" if above_open(b) else "1d")
-        col = SUITE_COLORS.get(tok, "#9c9c9c")
+        if candles == "strat":
+            col = SUITE_COLORS.get(tok, "#9c9c9c")
+        else:  # plain candles: green bull (close above open), red bear
+            col = SUITE_COLORS["2u"] if above_open(b) else SUITE_COLORS["2d"]
         ax.vlines(i, b.low, b.high, color=col, linewidth=1)
         ax.add_patch(plt.Rectangle((i - 0.33, min(b.open, b.close)), 0.66, max(abs(b.close - b.open), 1e-6),
                                    facecolor=col, edgecolor=col))
+        if prev and candles == "plain":  # bar type as a small label under the candle
+            kind = tok.rstrip("ud") if tok[0] in "13" else tok
+            ax.annotate(kind, (i, b.low), textcoords="offset points", xytext=(0, -9), ha="center",
+                        color="#8a8a8a", fontsize=5.5)
         prev = b
 
     def x_of(t):
@@ -1217,8 +1224,10 @@ def chart(path, sbars, pos, levels, clean, clock, sess, chart_tf, all_bars, dail
     ax.tick_params(axis="y", colors="#cccccc", labelsize=8)
     for s in ax.spines.values():
         s.set_color("#333333")
-    ax.set_title(f"{pos.inst.underlying} {chart_tf} with {pos.inst.label()} fills. Candles in TheStrat Suite bar-type "
-                 "colors (green 2u, red 2d, yellow/orange 1, teal/pink 3)", color="#dddddd", fontsize=9)
+    note = ("candles in TheStrat Suite bar-type colors" if candles == "strat"
+            else "green bull, red bear; bar type under each candle")
+    tf_label = chart_tf if chart_tf != "base" else f"{int((cb[0].end - cb[0].start).total_seconds() // 60)}m"
+    ax.set_title(f"{pos.inst.underlying} {tf_label} with {pos.inst.label()} fills ({note})", color="#dddddd", fontsize=9)
     ax.set_xlim(-1, len(cb) + 14)
     fig.tight_layout()
     fig.savefig(path, facecolor=bg)
@@ -1263,6 +1272,8 @@ def main(argv=None):
     ap.add_argument("--display-tz", default="America/Los_Angeles")
     ap.add_argument("--chart", action="store_true", help="Write a PNG chart (needs matplotlib)")
     ap.add_argument("--chart-tf", default="base", help="Chart candle timeframe: base, 5m, 15m, ...")
+    ap.add_argument("--candles", default="plain", choices=["plain", "strat"],
+                    help="plain: green bull, red bear, bar type labeled; strat: Suite bar-type colors")
     ap.add_argument("--out", default="strat_review_out")
     run(ap.parse_args(argv))
 

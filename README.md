@@ -30,7 +30,7 @@ Then ask: *"Review my SPY calls from today"* and attach your export.
 - Every trigger of the session, with stop, target, and whether it worked
 - The day's worst point against your loss limit
 - Priced alternatives in dollars and R, labeled as real marks or estimates
-- A chart in TheStrat Suite bar-type colors (green 2u, red 2d; green and red are bull and bear, never good and bad)
+- A chart of the session with your fills marked: green candles bull, red bear, each bar's Strat type labeled underneath (`--candles strat` for Suite bar-type colors instead)
 
 ## Method
 
