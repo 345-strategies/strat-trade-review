@@ -1110,8 +1110,10 @@ def run(args):
             delta=dlt, clean=None if not clean else {k: (v if k != "event" else v["combo"]) for k, v in clean.items()},
         ))
         if args.chart:
+            cpath = out / f"chart_{pi}_{re.sub(r'[^A-Za-z0-9]+', '_', inst.label())}.png"
+            report["positions"][-1]["chart"] = cpath.name
             try:
-                chart(out / f"chart_{pi}_{re.sub(r'[^A-Za-z0-9]+', '_', inst.label())}.png", sbars, pos, levels,
+                chart(cpath, sbars, pos, levels,
                       clean, clock, sess, args.chart_tf, bars, daily, args.candles)
             except ImportError:
                 md.append("_Chart skipped: matplotlib not installed._\n")
@@ -1138,6 +1140,10 @@ def run(args):
             if day_worst is None or tot_lo < day_worst[0]:
                 day_worst = (tot_lo, t)
     total = sum(p["pnl"] for p in report["positions"])
+    report["net"] = total
+    report["trade_date"] = fills[0].time.astimezone(ET).date().isoformat()
+    report["max_daily_loss"] = args.max_daily_loss
+    report["day_worst"] = None if not day_worst else {"pnl": day_worst[0], "at": clock.fmt(day_worst[1])}
     head = ["# TheStrat trade review", "",
             f"Positions: {len(report['positions'])}. Net: {money(total)}. Times {clock.abbr}"
             + ("" if clock.abbr == "ET" else " (ET)") + ".",

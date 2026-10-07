@@ -17,12 +17,12 @@ It ends with a one-paragraph "what you should have done" plan the trader can reu
 
 ## Bundled files
 
-This skill ships with `scripts/strat_review.py`, `scripts/import_fills.py`, `references/` (strat-primer, data-sources, connect-and-import), `assets/journal-entry-template.md` and a worked example in `examples/`. If they are not next to this file, get them from github.com/natebking/strat-trade-review (the `skills/strat-trade-review/` folder).
+This skill ships with `scripts/strat_review.py`, `scripts/import_fills.py`, `scripts/share_post.py`, `references/` (strat-primer, data-sources, connect-and-import), `assets/journal-entry-template.md` and a worked example in `examples/`. If they are not next to this file, get them from github.com/natebking/strat-trade-review (the `skills/strat-trade-review/` folder).
 
 ## Conventions (do not drift from these)
 
 - **TheStrat grammar follows TheStrat Suite v3.1.x and its TheStratGrammar spec** (github.com/natebking/thestrat-suite). Summary in `references/strat-primer.md`. The rules that matter most: equal is not a break; `2u`/`2d` name the broken side, not the candle color; a `2u`/`2d` that closes back inside the prior range is a Failing 2 (`F2u` bearish, `F2d` bullish); a close exactly at the open counts as not above; Full Timeframe Continuity (FTFC) uses only close-vs-open of each forming bar.
-- **Green and red mean bull and bear, never good and bad.** Bar-type colors follow the Suite palette (2u `#4caf50`, 2d `#f23645`, 1u `#ffeb3b`, 1d `#ff9800`, 3u `#089981`, 3d `#e91e63`, F2d `#81c784`, F2u `#f77c80`). Fill markers on charts are neutral (blue buys, white sells).
+- **Green and red mean bull and bear, never good and bad.** Bar-type colors follow the Suite palette (2u `#4caf50`, 2d `#f23645`, 1u `#ffeb3b`, 1d `#ff9800`, 3u `#089981`, 3d `#e91e63`, F2d `#81c784`, F2u `#f77c80`). Charts draw plain candles by default (green close above open, red otherwise) with each bar's type labeled underneath; `--candles strat` colors them by bar type instead. Fill markers are neutral (blue buys, white sells). A P/L is never colored green or red for gain or loss.
 - **Times:** show the trader's local zone with ET in parentheses, e.g. `7:25 PT (10:25 ET)`. Default local zone is Pacific; change with `--display-tz`.
 - **Any Pine Script you produce is delivered as a `.txt` file.**
 - **Label every estimate.** A number priced from real contract bars is a mark; a number priced by the Black-Scholes fallback says ESTIMATE. Before the close, "hold" rows are marks, not closing prices.
@@ -35,8 +35,6 @@ Make this as easy as possible for the trader. Ask only for the symbol and the da
 2. **Their broker's export, unedited.** Tell them exactly where to click for their broker, then pass the file straight to `--fills`. The script auto-detects Schwab/thinkorswim, Interactive Brokers, Tradovate, NinjaTrader, Webull, Robinhood, Public and Alpaca exports. Robinhood exports have no time of day, so ask for the times from the order details.
 3. **Paste or screenshot.** Transcribe into the normalized CSV, show the table back, and confirm the time zone.
 
-Also ask, without blocking on it: the stop or plan they had, and their daily loss limit if they use one.
-
 If times carry no zone, pass `--fills-tz` (ET, PT, CT, UTC). Never ask for API keys or passwords in chat.
 
 The normalized CSV, for anything the importer does not recognize:
@@ -47,6 +45,19 @@ time,symbol,side,qty,price,fees,net
 ```
 
 `symbol` can be an OCC option (`SPY261007C00775000`), `SPY 10/07/2026 775 C`, a ticker, or a futures contract (`ESZ6`, `MESZ26`, `ES 12-26`). `fees` is positive for a cost, negative for a rebate. A `net` column (signed cash) overrides price x qty x multiplier so broker P/L matches to the cent.
+
+## Step 1b: Ask about the trade (one message, all optional)
+
+The numbers say what happened; only the trader can say what they were thinking, and the review is worth more when it can hold the two side by side. Ask these together, in one short message, while you fetch data. Don't block on answers; review what you have.
+
+1. **The plan at entry.** What did you see, on which timeframe, and what was the trigger? Where was your stop and your target?
+2. **Adds and exits.** What made you add (if you did), and what made you get out when you did?
+3. **Your read.** What do you think went right or wrong?
+4. **How it felt.** One word each for entry and exit (calm, rushed, bored, chasing, scared, certain).
+5. **Your rules.** Daily loss limit, and how much you risk per trade, if you use either.
+6. **Sharing.** Want a post for Discord when we're done? With dollar amounts, or R only?
+
+In the review, quote their answer and confirm or correct it with a number: "You said you bought the breakout; the 15m bar you bought was already closing back inside (F2u) while the 30m, 60m and Day were all below their opens." If the trader asks about risk, sizing, discipline or mindset, or the flags show `AVERAGED_DOWN`, `AGAINST_FTFC` or a near-miss on the loss limit, use the `trading-risk-and-mindset` skill for that part if it is installed.
 
 ## Step 2: Get the bars
 
@@ -59,7 +70,12 @@ You need, for the trade's session:
 | The option contract's own intraday bars | real marks for alternatives and drawdown | optional; without it, option alternatives are Black-Scholes ESTIMATES |
 | Next-expiry contract, leveraged ETF bars | roll / shares comparisons | only if the trader asks about those |
 
-Pick a source with `references/data-sources.md`. The free default is Yahoo Finance through `yfinance` (no key; 1m bars reach back about 30 days, 5m about 60 days; futures as `ES=F`, `NQ=F`, `CL=F`, `GC=F`). It has no historical intraday data for option contracts, so for real option marks use a broker tool or a paid source from that file. If a connected tool (broker or TradingView) can return bars, prefer it and save the result to CSV or JSON; the script reads plain CSV, Public's `get_price_history` JSON, and TradingView `{t,o,h,l,c}` rows or columns.
+Pick a source with `references/data-sources.md`, in this order:
+
+1. **A connected broker or TradingView tool.** Pull the bars yourself and save them to CSV or JSON; the script reads plain CSV, Public's `get_price_history` JSON, and TradingView `{t,o,h,l,c}` rows or columns.
+2. **Free broker data the trader already has an account for.** Public, Tradier and Alpaca (indicative feed) all return intraday bars for option contracts at no extra cost; Schwab and IBKR cover the underlying. Tell the trader this exists before reaching for a paid source.
+3. **Yahoo Finance via `yfinance`**, free with no account (1m back about 30 days, 5m about 60; futures as `ES=F`, `NQ=F`, `CL=F`, `GC=F`). Enough for shares and futures, but it has no option contract history.
+4. **Paid** (Massive, Databento, Theta Data) only when real option marks matter and no broker route works.
 
 With 5m bars, a fill inside a 5m bar is judged on the bars closed before it. That is the honest no-lookahead view, but it can miss a break that happened in the same 5 minutes. Use 1m bars when the trader's question is about a few minutes either way.
 
@@ -144,6 +160,14 @@ Rules for the write-up:
 ## Step 5: Save it
 
 If the trader keeps a journal, write an entry from `assets/journal-entry-template.md` (frontmatter, fills table, Strat context table, flags, review, lesson) and attach the chart. Leave "What I saw / Why I took it / How I felt" for the trader's own words and ask them one question for each of the decisions you flagged.
+
+## Step 6: Share it (when asked)
+
+```bash
+python3 scripts/share_post.py --review review_out --lesson "Wait for the 30m trigger." [--r-only] [--handle @name]
+```
+
+It writes `review_out/share/post.md` (under Discord's 2,000-character limit, no tables, since Discord does not render them; alternatives go in a code block), `card.png` (a 1200x675 summary card) and `chart.png`. Write the lesson yourself in one sentence, in the trader's words where you can. Show the post, attach both images, and tell them to paste the text and drop the two images into the same Discord message. Use `--r-only` when they would rather not show dollars; R travels better between account sizes anyway.
 
 ## Pitfalls
 

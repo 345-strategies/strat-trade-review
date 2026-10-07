@@ -31,7 +31,7 @@ flags: []          # SCALED_IN, AVERAGED_DOWN, SCALED_OUT, AGAINST_CONTINUITY, A
 
 ## Objective context at entry
 
-<!-- From review.md: the TheStrat state table (15m / 30m / 60m / Day, continuity) at each fill. -->
+<!-- From review.md: the TheStrat state table (5m / 15m / 30m / 60m, Day for context, continuity) at each fill. -->
 
 ## How it was filled
 
