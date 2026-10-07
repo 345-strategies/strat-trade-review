@@ -1,0 +1,9 @@
+Account Statement for 123 (Individual) since 10/7/26 through 10/7/26
+
+Account Trade History
+,Exec Time,Spread,Side,Qty,Pos Effect,Symbol,Exp,Strike,Type,Price,Net Price,Order Type
+,10/7/26 10:25:21,SINGLE,BUY,+2,TO OPEN,SPY,7 OCT 26,775,CALL,1.13,1.13,LMT
+,10/7/26 10:45:30,SINGLE,BUY,+2,TO OPEN,SPY,7 OCT 26,775,CALL,.71,.71,LMT
+,10/7/26 11:13:40,SINGLE,SELL,-4,TO CLOSE,SPY,7 OCT 26,775,CALL,1.1475,1.1475,LMT
+
+Profits and Losses

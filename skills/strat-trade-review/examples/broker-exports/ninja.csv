@@ -1,0 +1,3 @@
+Instrument,Action,Quantity,Price,Time,ID,E/X,Position,Order ID,Name,Commission,Rate,Account,Connection
+ES 12-26,Buy,1,6810.25,10/7/2026 10:25:21 AM,1,Entry,1 L,1,Entry,$2.09,1,Sim101,Sim
+ES 12-26,Sell,1,6815.50,10/7/2026 11:13:40 AM,2,Exit,-,2,Exit,$2.09,1,Sim101,Sim

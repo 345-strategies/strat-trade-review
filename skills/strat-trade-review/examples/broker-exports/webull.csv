@@ -1,0 +1,4 @@
+Name,Symbol,Side,Status,Filled,Total Qty,Price,Avg Price,Time-in-Force,Placed Time,Filled Time
+SPY,SPY,Buy,Filled,100,100,@774.80,774.80,DAY,10/07/2026 10:25:58 EDT,10/07/2026 10:26:00 EDT
+SPY,SPY,Sell,Filled,100,100,@774.85,774.85,DAY,10/07/2026 11:19:59 EDT,10/07/2026 11:20:00 EDT
+SPY,SPY,Sell,Cancelled,0,100,@780.00,,DAY,10/07/2026 11:00:00 EDT,

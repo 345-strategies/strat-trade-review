@@ -1,0 +1,4 @@
+"ClientAccountID","AssetClass","Symbol","UnderlyingSymbol","Strike","Expiry","Put/Call","DateTime","Buy/Sell","Quantity","TradePrice","IBCommission","Multiplier","LevelOfDetail"
+"U1","OPT","SPY   261007C00775000","SPY","775","20261007","C","20261007;102521","BUY","2","1.13","-1.30","100","EXECUTION"
+"U1","OPT","SPY   261007C00775000","SPY","775","20261007","C","20261007;104530","BUY","2","0.71","-1.30","100","EXECUTION"
+"U1","OPT","SPY   261007C00775000","SPY","775","20261007","C","20261007;111340","SELL","-4","1.1475","-1.30","100","EXECUTION"

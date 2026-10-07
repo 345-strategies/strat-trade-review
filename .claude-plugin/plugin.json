@@ -1,0 +1,17 @@
+{
+  "name": "strat-trade-review",
+  "description": "Review options, shares and futures trades against TheStrat multi-timeframe price action, with broker import and priced alternatives.",
+  "version": "1.0.0",
+  "author": {
+    "name": "345 Strategies"
+  },
+  "keywords": [
+    "trading",
+    "thestrat",
+    "options",
+    "futures",
+    "journal"
+  ],
+  "repository": "https://github.com/natebking/strat-trade-review",
+  "homepage": "https://github.com/natebking/strat-trade-review"
+}
