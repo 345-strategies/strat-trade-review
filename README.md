@@ -15,7 +15,7 @@ Hand an AI assistant your fills and it reviews the trade the way a TheStrat trad
 |---|---|
 | **Claude (claude.ai, desktop, mobile)** | Download [`dist/strat-trade-review.zip`](https://github.com/natebking/strat-trade-review/raw/main/dist/strat-trade-review.zip), then Settings > Capabilities > Skills > Upload skill. Code execution must be on. |
 | **Claude Code** | `/plugin marketplace add natebking/strat-trade-review`, then `/plugin install strat-trade-review@strat-trade-review`. Or copy `skills/strat-trade-review` into `~/.claude/skills/`. |
-| **ChatGPT, with Skills on your plan** | Upload the same `dist/strat-trade-review.zip` as a skill. |
+| **ChatGPT, with Skills on your plan** | Upload the same [`dist/strat-trade-review.zip`](https://github.com/natebking/strat-trade-review/raw/main/dist/strat-trade-review.zip) as a skill. |
 | **ChatGPT, Custom GPT** | Follow [chatgpt/README.md](chatgpt/README.md): paste the instructions, upload two scripts, turn on Code Interpreter. |
 | **Codex and other agents that read `SKILL.md`** | Copy `skills/strat-trade-review` into the agent's skills folder. |
 | **Just Python** | `python3 skills/strat-trade-review/scripts/strat_review.py --fills my_export.csv --fetch yfinance --yf-symbol SPY --chart` |
@@ -42,4 +42,4 @@ This reviews what happened against a stated method. It does not recommend trades
 
 ## Maintaining
 
-This folder lives in the 345 Strategies site repo. Edit files under `skills/strat-trade-review/`, then run `python3 tools/build_zip.py` to rebuild `dist/strat-trade-review.zip`.
+This repo is the single source of truth; the 345 Strategies site links here rather than hosting a copy. Edit files under `skills/strat-trade-review/`, then run `python3 tools/build_zip.py` to rebuild `dist/strat-trade-review.zip`.

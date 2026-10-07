@@ -17,7 +17,7 @@ It ends with a one-paragraph "what you should have done" plan the trader can reu
 
 ## Bundled files
 
-This skill ships with `scripts/strat_review.py`, `scripts/import_fills.py`, `references/` (strat-primer, data-sources, connect-and-import), `assets/journal-entry-template.md` and a worked example in `examples/`. If they are not next to this file, get them from the repo or zip this skill came from (the `skills/strat-trade-review/` folder).
+This skill ships with `scripts/strat_review.py`, `scripts/import_fills.py`, `references/` (strat-primer, data-sources, connect-and-import), `assets/journal-entry-template.md` and a worked example in `examples/`. If they are not next to this file, get them from github.com/natebking/strat-trade-review (the `skills/strat-trade-review/` folder).
 
 ## Conventions (do not drift from these)
 
