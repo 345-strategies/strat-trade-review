@@ -25,7 +25,7 @@ import json
 import re
 import shutil
 import textwrap
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 BULL, BEAR = "#4caf50", "#f23645"   # TheStrat Suite 2u / 2d
@@ -80,62 +80,102 @@ def cc_token(combo: str) -> str:
     return combo.rsplit("-", 1)[-1] if combo else ""
 
 
-def strat_points(rep: dict, pos: dict) -> tuple[list[str], list[str]]:
-    """Draft 'with the Strat' and 'against the Strat' points from the review data."""
-    pros, cons = [], []
+GOOD, BAD = "#5b9cff", "#f5a524"   # status colors for good / bad calls: never green and red, which mean bull and bear
+
+
+def strat_checks(rep: dict, pos: dict) -> list[dict]:
+    """The same six Strat checks for every trade, each graded good or bad with the evidence.
+    A check that the data can't decide (no loss limit given) is left out."""
     bull = pos["direction"] == "BULL"
     tfs = pos.get("tfs") or [tf for tf in pos["fills"][0]["states"] if tf != "D"]
     side0 = pos["fills"][0]["side"]
     entries = [(n, f) for n, f in enumerate(pos["fills"], 1) if f["side"] == side0]
     exits = [(n, f) for n, f in enumerate(pos["fills"], 1) if f["side"] != side0]
     broke, failed = ("2u", "F2u") if bull else ("2d", "F2d")
-    against_groups: dict = {}
+    away = "below" if bull else "above"
+    checks = []
+
+    # 1. on a trigger, and the trigger was holding
+    fails, hits = [], []
     for n, f in entries:
         st = f["states"]
-        signs = {tf: st[tf].get("sign") for tf in tfs if tf in st}
-        against = tuple(tf for tf, sg in signs.items() if sg is not None and sg != bull)
-        known = [tf for tf, sg in signs.items() if sg is not None]
-        if known and not against and len(known) == len(tfs):
-            pros.append(f"#{n} entered with full continuity ({', '.join(tfs)})")
-        elif len(against) >= 2:
-            against_groups.setdefault(against, []).append(n)
-        brk = [tf for tf in tfs if cc_token(st.get(tf, {}).get("combo", "")) == broke]
-        fail = [tf for tf in tfs if cc_token(st.get(tf, {}).get("combo", "")) == failed]
-        if fail:
-            cons.append(f"#{n} took a {fail[0]} break that was failing ({failed})")
-        elif brk:
-            pros.append(f"#{n} entered on a {brk[0]} {broke} break")
-    for against, ns in against_groups.items():
-        who = ", ".join(f"#{n}" for n in ns)
-        cons.append(f"{who} entered with {', '.join(against)} {'below' if bull else 'above'} their opens")
-    if "AVERAGED_DOWN" in pos["flags"]:
-        worse = [n for n, f in entries[1:] if (f["price"] < entries[0][1]["price"]) == (side0 == "BUY")]
-        cons.append(f"Averaged down at #{', #'.join(map(str, worse))} with no new trigger" if worse
-                    else "Averaged down with no new trigger")
-    if "EARLY_SESSION" in pos["flags"]:
-        cons.append("Entered before 10:00 ET, the noisiest part of the session")
-    c = pos.get("clean")
-    if c and c.get("time"):
-        from datetime import datetime, timedelta
+        fl = [tf for tf in tfs if cc_token(st.get(tf, {}).get("combo", "")) == failed]
+        br = [tf for tf in tfs if cc_token(st.get(tf, {}).get("combo", "")) == broke]
+        if fl:
+            fails.append(f"#{n} {fl[0]} break already failing ({failed})")
+        elif br:
+            hits.append(f"#{n} on a {br[0]} {broke} break")
+        else:
+            fails.append(f"#{n} no {broke} break on any timeframe")
+    checks.append(dict(ok=not fails, name="Entered on a live trigger", detail="; ".join(fails or hits)))
+
+    # 2. continuity
+    groups: dict = {}
+    for n, f in entries:
+        against = tuple(tf for tf in tfs if f["states"].get(tf, {}).get("sign") is not None
+                        and f["states"][tf]["sign"] != bull)
+        if len(against) >= 2:
+            groups.setdefault(against, []).append(f"#{n}")
+    checks.append(dict(ok=not groups, name="With timeframe continuity",
+                       detail="; ".join(f"{', '.join(ns)} with {', '.join(a)} {away} their opens"
+                                        for a, ns in groups.items())
+                       or f"{', '.join(tfs)} agreed at entry"))
+
+    # 3. adds
+    worse = [n for n, f in entries[1:] if (f["price"] < entries[0][1]["price"]) == (side0 == "BUY")]
+    checks.append(dict(ok=not worse, name="No averaging down",
+                       detail=(f"#{', #'.join(map(str, worse))} added at a worse price with no new trigger"
+                               if worse else ("adds only on strength" if len(entries) > 1 else "one entry"))))
+
+    # 4. the exit against the plan: sold on the real trigger, or before the first target
+    c = pos.get("clean") or {}
+    t1 = pos.get("t1")
+    exit_detail, exit_ok = "", True
+    if c.get("time") and exits:
         t0 = datetime.fromisoformat(c["time"])
-        mins = {"5m": 5, "15m": 15, "30m": 30, "60m": 60}.get(c.get("tf"), 30)
-        early = [n for n, f in exits if t0 - timedelta(minutes=mins) <= datetime.fromisoformat(f["time"]) <= t0 + timedelta(minutes=mins)]
-        if early:
-            cons.append(f"Sold on the {c['tf']} {c['event']} trigger, which was the real entry")
-        risk = c.get("risk")
-        if risk and c.get("pnl") is not None:
-            if pos["pnl"] >= c["pnl"]:
-                pros.append(f"Beat the clean {c['tf']} trigger plan ({r_of(c['pnl'], risk)})")
+        mins = timedelta(minutes={"5m": 5, "15m": 15, "30m": 30, "60m": 60}.get(c.get("tf"), 30))
+        on_trigger = [f"#{n}" for n, f in exits if t0 - mins <= datetime.fromisoformat(f["time"]) <= t0 + mins]
+        if on_trigger:
+            exit_ok = False
+            exit_detail = f"{', '.join(on_trigger)} sold on the {c['tf']} {c['event']} trigger, the real entry"
+    if exit_ok and t1 is not None and exits:
+        reached = [n for n, f in exits if f.get("underlying") is not None
+                   and ((f["underlying"] >= t1) if bull else (f["underlying"] <= t1))]
+        # a higher-timeframe signal still in force with the trade at the exit: a 2 (or a failed 2 the other
+        # way) in the trade's direction, forming bar on the trade's side of its open
+        htf = [tf for tf in ("30m", "60m", "D") if tf in pos["fills"][0]["states"]]
+        in_force = []
+        for n, f in exits:
+            for tf in htf:
+                st = f["states"].get(tf, {})
+                if st.get("sign") == bull and cc_token(st.get("combo", "")) in ((broke, "F2d") if bull else (broke, "F2u")):
+                    in_force.append((n, tf, cc_token(st["combo"])))
+                    break
+        if in_force and not reached:
+            n, tf, tok = in_force[0]
+            exit_ok, exit_detail = False, f"#{n} sold with the {tf} {tok} still in force"
+        else:
+            exit_ok = bool(reached) or pos["pnl"] < 0
+            exit_detail = (f"#{reached[0]} out at or past T1 {t1:.2f}" if reached
+                           else ("closed for a loss" if pos["pnl"] < 0 else f"out before T1 {t1:.2f}"))
+    if exits:
+        checks.append(dict(ok=exit_ok, name="Exit by plan", detail=exit_detail))
+
+    # 5. the open
+    checks.append(dict(ok="EARLY_SESSION" not in pos["flags"], name="Let the open settle",
+                       detail="entered before 10:00 ET" if "EARLY_SESSION" in pos["flags"] else "first entry after 10:00 ET"))
+
+    # 6. the daily loss limit
     dw, lim = rep.get("day_worst"), rep.get("max_daily_loss")
     if dw and lim:
         used = abs(min(dw["pnl"], 0)) / abs(lim)
-        if used >= 0.8:
-            cons.append(f"Worst point used {used:.0%} of the daily loss limit")
-        elif used <= 0.5:
-            pros.append(f"Stayed well inside the daily loss limit ({used:.0%} used)")
-    if not any(p.startswith("#") for p in cons) and entries and not pros:
-        pros.append("No entries against continuity")
-    return pros[:3], cons[:5]
+        checks.append(dict(ok=used < 0.8, name="Inside the loss limit", detail=f"worst point used {used:.0%} of it"))
+    return checks
+
+
+def custom_checks(goods: list[str] | None, bads: list[str] | None) -> list[dict]:
+    return ([dict(ok=True, name=g, detail="") for g in goods or []]
+            + [dict(ok=False, name=b, detail="") for b in bads or []])
 
 
 def main_position(rep: dict) -> dict:
@@ -149,7 +189,7 @@ def first_fill_context(pos: dict) -> tuple[str, str]:
     return f["continuity"], " | ".join(cells)
 
 
-def build_text(rep: dict, pos: dict, args, pros: list[str], cons: list[str]) -> str:
+def build_text(rep: dict, pos: dict, args, checks: list[dict]) -> str:
     risk = (pos.get("clean") or {}).get("risk")
     cost = pos.get("cost") if pos["asset"] != "future" else None
     show_money = not args.no_dollars
@@ -157,21 +197,21 @@ def build_text(rep: dict, pos: dict, args, pros: list[str], cons: list[str]) -> 
     arrow = "🟢 BULL" if pos["direction"] == "BULL" else "🔴 BEAR"
     head, rest = result_parts(pos, show_money)
     unit = "contracts" if pos["asset"] != "stock" else "shares"
-    lines = [f"**{pos['label']} · {day:%b %-d, %Y}** · {arrow}" + (f" · {args.handle}" if args.handle else ""),
-             f"**Result: {head}**" + (f" ({', '.join(rest)})" if rest else "") + f" on {pos['qty']:g} {unit}"]
-    if pros:
-        lines.append("**With the Strat**")
-        lines += [f"+ {p}" for p in pros]
-    if cons:
-        lines.append("**Against the Strat**")
-        lines += [f"− {p}" for p in cons]
+    good = sum(1 for c in checks if c["ok"])
+    lines = [f"**{pos['label']} · {day:%b %-d, %Y}** · {arrow}" + (f" · {args.handle}" if args.handle else "")]
+    if args.setup:
+        lines.append(f"**Setup:** {args.setup}")
+    lines += [f"**Result: {head}**" + (f" ({', '.join(rest)})" if rest else "") + f" on {pos['qty']:g} {unit}"]
+    if args.lesson:
+        lines.append(f"> **Lesson:** {args.lesson}")
+    lines.append(f"**Strat checklist: {good} of {len(checks)} good**")
+    lines += [f"{'✓ Good' if c['ok'] else '✗ Bad'} · {c['name']}" + (f": {c['detail']}" if c["detail"] else "")
+              for c in checks]
     c = pos.get("clean")
     if c and c.get("trigger"):
         lines.append(f"**Clean Strat:** {c['tf']} {c['event']} trigger {c['trigger']:.2f}, C1 stop {c['stop_c1']:.2f}"
                      f" → {pct_of(c['pnl'], cost) or r_of(c['pnl'], risk)}"
                      + (f", {r_of(c['pnl'], risk)}" if cost and risk else ""))
-    if args.lesson:
-        lines.append(f"**Lesson:** {args.lesson}")
     rows = []
     for a in pos["alternatives"]:
         cells = [x for x in (pct_of(a["pnl"], cost), r_of(a["pnl"], risk)) if x]
@@ -191,10 +231,11 @@ def build_text(rep: dict, pos: dict, args, pros: list[str], cons: list[str]) -> 
     return text
 
 
-def card(path: Path, rep: dict, pos: dict, args, pros: list[str], cons: list[str]) -> None:
+def card(path: Path, rep: dict, pos: dict, args, checks: list[dict]) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.patches import Circle, FancyBboxPatch
     matplotlib.rcParams["text.parse_math"] = False
 
     risk = (pos.get("clean") or {}).get("risk")
@@ -208,66 +249,74 @@ def card(path: Path, rep: dict, pos: dict, args, pros: list[str], cons: list[str
     ax.set_ylim(0, 675)
     t = lambda x, y, s, **k: ax.text(x, y, s, color=k.pop("color", FG), fontsize=k.pop("size", 14),
                                      va=k.pop("va", "top"), ha=k.pop("ha", "left"), **k)
+    box = lambda x, y, w, h, c, r=8: ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle=f"round,pad=0,rounding_size={r}",
+                                                                 fc=c, ec="none"))
+
+    # header
     day = date.fromisoformat(rep.get("trade_date") or pos["fills"][0]["time"][:10])
-    t(40, 640, pos["label"], size=28, weight="bold")
-    t(40, 596, f"{day:%A %b %-d, %Y}" + (f"   {args.handle}" if args.handle else ""), color=MUTED, size=14)
+    t(40, 642, pos["label"], size=26, weight="bold")
+    t(40, 602, f"{day:%A %b %-d, %Y}" + (f"   ·   {args.setup}" if args.setup else "")
+      + (f"   {args.handle}" if args.handle else ""), color=MUTED, size=13)
     bull = pos["direction"] == "BULL"
-    ax.add_patch(plt.Rectangle((1040, 604), 120, 38, color=BULL if bull else BEAR))
-    t(1100, 623, "BULL" if bull else "BEAR", ha="center", va="center", size=15, weight="bold", color="#0f0f0f")
+    box(1060, 610, 100, 34, BULL if bull else BEAR, 6)
+    t(1110, 627, ("▲ BULL" if bull else "▼ BEAR"), ha="center", va="center", size=13, weight="bold", color=BG)
 
+    # hero result: one number, then the supporting ones
     head, rest = result_parts(pos, show_money)
-    t(40, 560, head, size=50, weight="bold")
     unit = "contracts" if pos["asset"] != "stock" else "shares"
-    t(40, 478, "   ".join(rest + [f"{pos['qty']:g} {unit}"]), color=MUTED, size=15)
+    t(40, 576, head, size=48, weight="bold")
+    t(40, 498, "  ·  ".join(rest + [f"{pos['qty']:g} {unit}"]), color=MUTED, size=13)
 
-    def bullets(y, title, items, mark):
-        t(40, y, title, color=MUTED, size=12, weight="bold")
-        y -= 24
-        for it in items:
-            lines = textwrap.wrap(it, 54)[:2]
-            t(40, y, mark, size=15, weight="bold")
-            for ln in lines:
-                t(64, y, ln, size=13.5)
-                y -= 22
-            y -= 6
-        return y - 8
-
-    y = 432
-    if pros:
-        y = bullets(y, "WITH THE STRAT", pros, "+")
-    if cons:
-        y = bullets(y, "AGAINST THE STRAT", cons, "−")
-    if args.lesson and y > 90:
-        t(40, y, "LESSON", color=MUTED, size=12, weight="bold")
-        y -= 24
-        for ln in textwrap.wrap(args.lesson, 58)[:2]:
-            t(40, y, ln, size=14, style="italic")
-            y -= 22
+    # the checklist: same six checks every trade, graded good / bad with icon + label
+    good = sum(1 for c in checks if c["ok"])
+    t(40, 466, "STRAT CHECKLIST", color=MUTED, size=11, weight="bold")
+    t(600, 466, f"{good} of {len(checks)} good", color=FG, size=11, weight="bold", ha="right")
+    y = 436
+    for c in checks[:6]:
+        col = GOOD if c["ok"] else BAD
+        ax.add_patch(Circle((52, y - 9), 10, fc=col, ec="none"))
+        t(52, y - 9, "✓" if c["ok"] else "✗", ha="center", va="center", size=11, weight="bold", color=BG)
+        t(72, y, c["name"], size=12.5, weight="bold")
+        t(600, y, "GOOD" if c["ok"] else "BAD", size=9.5, weight="bold", color=col, ha="right")
+        if c["detail"]:
+            d = c["detail"] if len(c["detail"]) <= 70 else c["detail"][:69] + "…"
+            t(72, y - 19, d, size=10.5, color=MUTED)
+        y -= 44 if c["detail"] else 30
 
     # right panel: state at entry, then the alternatives
-    ax.add_patch(plt.Rectangle((650, 40), 510, 540, color=PANEL))
+    box(650, 150, 510, 432, PANEL)
     f0 = pos["fills"][0]
-    t(670, 565, f"AT ENTRY #1   ·   {f0['continuity']}", color=MUTED, size=12, weight="bold")
+    t(672, 562, "AT ENTRY #1", color=MUTED, size=11, weight="bold")
+    t(1138, 562, f0["continuity"], color=FG, size=11, weight="bold", ha="right")
     for i, (tf, st) in enumerate(f0["states"].items()):
-        x = 670 + i * 98
+        x = 672 + i * 96
         sign = st.get("sign")
-        t(x, 535, tf + (" (ctx)" if tf == "D" else ""), size=11, color=MUTED)
-        t(x, 512, st["combo"].replace("-(new)", "-new"), size=12, family="monospace",
-          color=FG if sign is None else (BULL if sign else BEAR))
-    t(670, 470, "ALTERNATIVES", color=MUTED, size=12, weight="bold")
-    hdr = [h for h, ok in (("% return", bool(cost)), ("R", bool(risk)), ("$", show_money)) if ok]
-    for k, h in enumerate(reversed(hdr)):
-        t(1140 - 90 * k, 470, h, color=MUTED, size=11, ha="right")
+        t(x, 534, tf + (" ctx" if tf == "D" else ""), size=10, color=MUTED)
+        t(x, 514, st["combo"].replace("-(new)", "-new") + ("" if sign is None else (" ↑" if sign else " ↓")),
+          size=11, family="monospace", color=FG if sign is None else (BULL if sign else BEAR))
+    ax.plot([672, 1138], [482, 482], color="#2a2a2a", linewidth=1)
+    t(672, 468, "IF YOU HAD", color=MUTED, size=11, weight="bold")
+    cols = [(h, ok) for h, ok in (("return", bool(cost)), ("R", bool(risk)), ("$", show_money)) if ok]
+    for k, (h, _) in enumerate(reversed(cols)):
+        t(1138 - 96 * k, 468, h, color=MUTED, size=10, ha="right")
     y = 440
-    for a in pos["alternatives"][:8]:
-        t(670, y, card_label(a["plan"]), size=12.5)
+    for a in pos["alternatives"][:7]:
+        actual = a["plan"] == "Actual"
+        t(672, y, "What you did" if actual else card_label(a["plan"]), size=12, weight="bold" if actual else "normal")
         vals = [v for v, ok in ((pct_of(a["pnl"], cost), bool(cost)), (r_of(a["pnl"], risk), bool(risk)),
                                 (money(a["pnl"]), show_money)) if ok]
         for k, v in enumerate(reversed(vals)):
-            t(1140 - 90 * k, y, v, size=12, ha="right", family="monospace",
-              weight="bold" if a["plan"] == "Actual" else "normal")
-        y -= 46
-    t(40, 30, "TheStrat review · 5m / 15m / 30m / 60m · not advice", color=MUTED, size=11, va="bottom")
+            t(1138 - 96 * k, y, v, size=11.5, ha="right", family="monospace", weight="bold" if actual else "normal")
+        y -= 38
+
+    # the lesson, the thing to remember: full width, its own band
+    if args.lesson:
+        box(40, 30, 1120, 100, "#18213a", 10)
+        ax.add_patch(plt.Rectangle((40, 30), 6, 100, color=GOOD))
+        t(66, 118, "LESSON", color=GOOD, size=11, weight="bold")
+        for k, ln in enumerate(textwrap.wrap(args.lesson, 88)[:2]):
+            t(66, 94 - k * 30, ln, size=19, weight="bold")
+    t(1160, 8, "TheStrat review · 5m / 15m / 30m / 60m · not advice", color=MUTED, size=9, ha="right", va="bottom")
     fig.savefig(path, facecolor=BG)
     plt.close(fig)
 
@@ -278,10 +327,13 @@ def main(argv=None):
     ap.add_argument("--lesson", help="One sentence: the lesson, in the trader's words if possible")
     ap.add_argument("--notes", help="Optional extra line, e.g. what you would do next time")
     ap.add_argument("--handle", help="Optional name or @handle to show")
+    ap.add_argument("--setup", help="Type of trade and primary timeframe/combo, e.g. 'Reversal · 30m F2d-2u'")
     ap.add_argument("--no-dollars", "--r-only", dest="no_dollars", action="store_true",
                     help="Show % and R only, no dollar amounts")
-    ap.add_argument("--pro", action="append", help="A 'with the Strat' point (repeatable; replaces the drafted ones)")
-    ap.add_argument("--con", action="append", help="An 'against the Strat' point (repeatable; replaces the drafted ones)")
+    ap.add_argument("--good", "--pro", dest="good", action="append",
+                    help="A good call, one line (repeatable; with --bad, replaces the drafted checklist)")
+    ap.add_argument("--bad", "--con", dest="bad", action="append",
+                    help="A bad call, one line (repeatable; with --good, replaces the drafted checklist)")
     ap.add_argument("--position", type=int, help="Which position to share (1-based); default the largest")
     args = ap.parse_args(argv)
 
@@ -292,18 +344,15 @@ def main(argv=None):
     pos = rep["positions"][args.position - 1] if args.position else main_position(rep)
     out = folder / "share"
     out.mkdir(exist_ok=True)
-    auto_pros, auto_cons = strat_points(rep, pos)
-    pros = args.pro if (args.pro or args.con) else auto_pros
-    cons = args.con if (args.pro or args.con) else auto_cons
-    pros, cons = pros or [], cons or []
-    text = build_text(rep, pos, args, pros, cons)
+    checks = custom_checks(args.good, args.bad) if (args.good or args.bad) else strat_checks(rep, pos)
+    text = build_text(rep, pos, args, checks)
     (out / "post.md").write_text(text + "\n")
     made = ["post.md"]
     if pos.get("timeframes_chart") and (folder / pos["timeframes_chart"]).exists():
         shutil.copy(folder / pos["timeframes_chart"], out / "timeframes.png")
         made.append("timeframes.png")
     try:
-        card(out / "card.png", rep, pos, args, pros, cons)
+        card(out / "card.png", rep, pos, args, checks)
         made.append("card.png")
     except ImportError:
         print("matplotlib not installed: skipped card.png")

@@ -17,17 +17,15 @@ flags: []          # SCALED_IN, AVERAGED_DOWN, SCALED_OUT, AGAINST_CONTINUITY, A
 
 # <Underlying> <contract> <local time> (<ET time>)
 
-## What I saw
+## Journal (in my words)
 
-<!-- Your words. The setup as it looked at the time: levels, timeframes, the trigger. -->
-
-## Why I took it
-
-<!-- The reasoning in the moment. If there was none, write that. -->
-
-## How I felt
-
-<!-- Bored, chasing, revenge, confident, rushed, patient, certain. -->
+**Type of Trade:**
+**Thesis:**
+**Primary Timeframe & Combo:**
+**When did this occur?:**
+**What did that create, negate, or do?:**
+**Management:**
+**Notes:**
 
 ## Objective context at entry
 
@@ -36,6 +34,10 @@ flags: []          # SCALED_IN, AVERAGED_DOWN, SCALED_OUT, AGAINST_CONTINUITY, A
 ## How it was filled
 
 <!-- From review.md: every leg, local time (ET), side, qty, price, net, underlying. -->
+
+## Strat checklist
+
+<!-- From share_post.py or the review: each check GOOD or BAD with its evidence. -->
 
 ## Flags
 
@@ -49,4 +51,4 @@ flags: []          # SCALED_IN, AVERAGED_DOWN, SCALED_OUT, AGAINST_CONTINUITY, A
 
 ## Images
 
-![chart](chart.png)
+![timeframes](timeframes.png)

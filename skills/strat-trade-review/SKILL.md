@@ -46,18 +46,37 @@ time,symbol,side,qty,price,fees,net
 
 `symbol` can be an OCC option (`SPY261007C00775000`), `SPY 10/07/2026 775 C`, a ticker, or a futures contract (`ESZ6`, `MESZ26`, `ES 12-26`). `fees` is positive for a cost, negative for a rebate. A `net` column (signed cash) overrides price x qty x multiplier so broker P/L matches to the cent.
 
-## Step 1b: Ask about the trade (one message, all optional)
+## Step 1b: Ask for their journal entry (one message, all optional)
 
-The numbers say what happened; only the trader can say what they were thinking, and the review is worth more when it can hold the two side by side. Ask these together, in one short message, while you fetch data. Don't block on answers; review what you have.
+The numbers say what happened; only the trader can say what they were thinking, and the review is worth more when it holds the two side by side. While you fetch data, ask for a journal entry in this format (they can paste it, answer in their own words, or skip any line). Don't block on answers; review what you have.
 
-1. **The plan at entry.** What did you see, on which timeframe, and what was the trigger? Where was your stop and your target?
-2. **Adds and exits.** What made you add (if you did), and what made you get out when you did?
-3. **Your read.** What do you think went right or wrong?
-4. **How it felt.** One word each for entry and exit (calm, rushed, bored, chasing, scared, certain).
-5. **Your rules.** Daily loss limit, and how much you risk per trade, if you use either.
-6. **Sharing.** Want a post for Discord when we're done? With dollar amounts, or R only?
+```
+Type of trade:                       (reversal, continuation, breakout, fade...)
+Thesis:                              (why this, why here)
+Primary timeframe & combo:           (e.g. 30m 2-1-2u)
+When did this occur?:                (time of the trigger or the idea)
+What did that create, negate, or do?: (the signal it put in force, or the one it broke)
+Management:                          (stop, target, adds, exits, and why)
+Notes:                               (anything else, including how it felt)
+```
 
-In the review, quote their answer and confirm or correct it with a number: "You said you bought the breakout; the 15m bar you bought was already closing back inside (F2u) while the 30m, 60m and Day were all below their opens." If the trader asks about risk, sizing, discipline or mindset, or the flags show `AVERAGED_DOWN`, `AGAINST_FTFC` or a near-miss on the loss limit, use the `trading-risk-and-mindset` skill for that part if it is installed.
+Also ask, in the same message: their daily loss limit and risk per trade if they use them, and whether they want a Discord post (with dollars, or % and R only).
+
+Then grade every line against the bars, quoting their words and answering with a number:
+
+| They wrote | Check it against |
+|---|---|
+| Type of trade | the family of the trigger they traded (Inside Reversal, 2-2 Reversal, 3-2 Expansion, continuation) and whether continuity supported that type |
+| Thesis | the state on 5m/15m/30m/60m and the Day at the entry; reference levels (gap fill, prior day high/low, opening range) |
+| Primary timeframe & combo | whether that combo actually triggered on that timeframe at that time (session triggers table), its C1 stop and target |
+| When | the fill times versus the trigger time: early, on it, or chasing |
+| Created / negated | which signals were in force at each fill and exit (a 2 in the trade's direction on 30m or 60m, a failed 2 the other way), and whether the trade's own trigger failed |
+| Management | adds versus new triggers, the stop versus C1, the exit versus T1 and any higher-timeframe signal still in force |
+| Notes | the feelings named, against the moments in the fills where they would have mattered |
+
+How that reads, for an entry like: *"ES gapped down; shortly after the open we traded into a pocket of liquidity over a lack of liquidity, so I looked long for a reversal. First entry stopped at breakeven. Second went against me, I averaged down when I could have re-entered, and at a loss I took profit on all at the easy liquidity level instead of seeing the higher-timeframe signal in force, so I should have held."* The review checks the type (was there a reversal trigger, and what were the 30m and 60m doing at the first entry), finds the trigger that would have made a re-entry valid and where it was, prices the average-down against that re-entry, and checks the exit: if the 60m was in a 2u above its open when they sold, the checklist marks "Exit by plan: sold with the 60m 2u still in force" and the alternatives show what holding to T1 or trailing would have paid.
+
+If the trader asks about risk, sizing, discipline or mindset, or the flags show `AVERAGED_DOWN`, `AGAINST_FTFC` or a near-miss on the loss limit, use the `trading-risk-and-mindset` skill for that part if it is installed.
 
 ## Step 2: Get the bars
 
@@ -161,23 +180,23 @@ Rules for the write-up:
 
 ## Step 5: Save it
 
-If the trader keeps a journal, write an entry from `assets/journal-entry-template.md` (frontmatter, fills table, Strat context table, flags, review, lesson) and attach the chart. Leave "What I saw / Why I took it / How I felt" for the trader's own words and ask them one question for each of the decisions you flagged.
+If the trader keeps a journal, write the entry from `assets/journal-entry-template.md`: their journal answers verbatim at the top, then the fills, the state on each timeframe at each fill, the checklist, the review and the lesson, with `timeframes_*.png` attached. Where they skipped a journal line, ask one question for each decision the checklist marked BAD rather than filling it in for them.
 
 ## Step 6: Share it (when asked)
 
 ```bash
 python3 scripts/share_post.py --review review_out --lesson "Wait for the 30m trigger." \
-  [--pro "..."] [--con "..."] [--no-dollars] [--handle @name]
+  [--setup "Reversal · 30m F2d-2u"] [--good "..."] [--bad "..."] [--no-dollars] [--handle @name]
 ```
 
 It writes to `review_out/share/`:
 
 - `post.md`: the message, under Discord's 2,000-character limit, no tables (Discord does not render them; alternatives go in a code block).
 - `timeframes.png`: the 5m/15m/30m/60m view, the main image.
-- `card.png`: a 1200x675 summary card that leads with % return on what was paid (options and shares; R for futures), then R, then dollars, and lists what was **with the Strat** and **against the Strat**.
+- `card.png`: a 1200x675 summary card. It leads with % return on what was paid (options and shares; R for futures), then R, then dollars; grades the trade on a **Strat checklist** (entered on a live trigger, with continuity, no averaging down, exit by plan, let the open settle, inside the loss limit), each marked GOOD or BAD with its evidence; shows the state at entry and what the alternatives would have paid; and puts the lesson in its own band across the bottom. Good and bad use blue and amber with an icon and a label, never green and red, which stay bull and bear.
 - `chart.png`: the single-timeframe view.
 
-The with/against points are drafted from the review: continuity at each entry, a break that was failing (F2u/F2d) when taken, averaging down, selling on the clean trigger, the loss limit. Read them against your own review and replace any that are off with `--pro` / `--con` (each repeatable; passing either replaces all drafted points). Keep each to one line that names the fill and the timeframe. Write the lesson in one sentence, in the trader's words where you can. Tell the trader to paste the text and attach `timeframes.png` and `card.png` to the same Discord message. `--no-dollars` hides dollar amounts and keeps % and R.
+The checklist is graded from the review data. Read each line against your own review; if one is wrong for this trade, replace the checklist with `--good` / `--bad` lines (each repeatable; passing either replaces the drafted checklist). Keep each to one line that names the fill and the timeframe. The lesson is the most prominent text on the card, so make it the one sentence the trader should carry into the next trade. Write the lesson in one sentence, in the trader's words where you can, and pass their type of trade and primary timeframe/combo as `--setup`. Tell the trader to paste the text and attach `timeframes.png` and `card.png` to the same Discord message. `--no-dollars` hides dollar amounts and keeps % and R.
 
 ## Pitfalls
 

@@ -1178,7 +1178,7 @@ def run(args):
                 extra = (f"{pos.direction}  ·  net {money(actual)}"
                          + (f" ({actual / cost:+.0%} on {money(cost).lstrip('-+')} paid)"
                             if cost and inst.asset != "future" else "")
-                         + (f"  ·  {', '.join(flags)}" if flags else ""))
+                         )
                 mtf_chart(mpath, bars, sess, s0, pos, fill_states, all_events, clean, clock, tfs, ctx_tfs, extra)
                 report["positions"][-1]["timeframes_chart"] = mpath.name
 
@@ -1261,9 +1261,6 @@ def chart(path, sbars, pos, levels, clean, clock, sess, chart_tf, all_bars, dail
                 return i
         return len(cb) - 1
 
-    for name, v in levels.items():
-        ax.axhline(v, color="#777777", linestyle=":", linewidth=0.8)
-        ax.text(len(cb) - 0.5, v, f" {name} {v:.2f}", color="#aaaaaa", fontsize=7, va="center")
     groups: dict = {}
     for f in pos.fills:  # one marker per chart bar and side
         if f.und is not None:
@@ -1415,7 +1412,6 @@ def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs,
         ax.set_xticklabels([clock.fmt(view[j][1].start).split(" (")[0] for j in range(0, len(view), stp)],
                            fontsize=7.5, color=MUTED)
         ax.tick_params(axis="y", colors=MUTED, labelsize=7.5)
-        ax.grid(axis="y", color=GRID, linewidth=0.5)
         ax.set_xlim(-1, len(view))
         for sp in ax.spines.values():
             sp.set_color(GRID)

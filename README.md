@@ -32,10 +32,10 @@ Then ask: *"Review my SPY calls from today"* and attach your export. Or: *"How m
 - Every trigger of the session, with stop, target, and whether it worked
 - The day's worst point against your loss limit
 - Priced alternatives in dollars and R, labeled as real marks or estimates
-- A few questions about your plan and how the trade felt, so the review can confirm or correct your own read
+- Your journal entry (type of trade, thesis, primary timeframe and combo, what it created or negated, management, notes), graded line by line against the bars
 - **A 5m / 15m / 30m / 60m image with every fill numbered**, the triggers, the clean Strat entry and its C1 stop, and the state on each timeframe at each fill (green candles bull, red bear, bar type labeled underneath)
 
-- A post ready for Discord (under the 2,000-character limit) with the timeframe image and a summary card: % return and R, what was with and against the Strat, and the alternatives (dollars optional)
+- A post ready for Discord (under the 2,000-character limit) with the timeframe image and a summary card: % return and R, a good/bad Strat checklist, the alternatives, and the lesson (dollars optional)
 
 ## Risk and mindset
 
