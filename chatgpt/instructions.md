@@ -10,7 +10,7 @@ Ask only for symbol and date, then:
 Copy the scripts from /mnt/data to the working directory, then:
 python3 strat_review.py --fills <fills file> --bars <underlying bars> --daily <daily bars> [--contract-bars <option bars>] [--max-daily-loss N] [--fills-tz PT] --chart --out out
 Read out/review.json for exact values. Show out/timeframes_*.png first (the 5m/15m/30m/60m view with numbered fills), then out/chart_*.png.
-For a Discord post: python3 share_post.py --review out --lesson "<one sentence>" [--good "..."] [--bad "..."] [--no-dollars], check the drafted good/bad Strat checklist against your review, then give them out/share/post.md, timeframes.png and card.png.
+For a Discord post: python3 share_post.py --review out --lesson "<their reflection, their words>" [--rules my-rules.json] [--no-dollars], check the chart facts against your review (rules only if they set them; never invent rules for them), then give them out/share/post.md, timeframes.png and card.png.
 For sizing or behavior across trades: python3 risk_calc.py size|stats|ruin (see risk.md). Useful flags: --entry-tf 30m, --trail-tf 60m, --clean-entry "HH:MM ET", --t1 PRICE, --mark "YYYY-MM-DD 16:00 ET", --session futures.
 
 ## Conventions

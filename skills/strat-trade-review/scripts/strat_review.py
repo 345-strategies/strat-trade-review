@@ -1477,7 +1477,8 @@ def main(argv=None):
     ap.add_argument("--mark", help="Mark time for hold/runner rows (default: last bar of session)")
     ap.add_argument("--or-minutes", type=int, default=30, help="Opening range length in minutes")
     ap.add_argument("--runner-fraction", type=float, default=0.25)
-    ap.add_argument("--caution-until", default="10:00", help="ET time before which entries get EARLY_SESSION ('' off)")
+    ap.add_argument("--caution-until", default="", help="ET time before which entries get EARLY_SESSION; off unless the trader "
+                                                       "has this rule (e.g. 09:45)")
     ap.add_argument("--max-daily-loss", type=float, help="Daily loss limit to test the worst point against")
     ap.add_argument("--triggers-window", type=float, default=3, help="Only list triggers within N hours of entry (0 = all)")
     ap.add_argument("--trail-tf", default="60m", help="Runner trails under each completed bar of this timeframe")

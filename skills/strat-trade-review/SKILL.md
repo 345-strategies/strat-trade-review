@@ -60,7 +60,9 @@ Management:                          (stop, target, adds, exits, and why)
 Notes:                               (anything else, including how it felt)
 ```
 
-Also ask, in the same message: their daily loss limit and risk per trade if they use them, and whether they want a Discord post (with dollars, or % and R only).
+Also ask, in the same message, whether they want a Discord post (with dollars, or % and R only).
+
+**Their rules, once.** The first time, ask what personal rules they hold themselves to (a daily loss limit, no averaging down, no entries before a time, a maximum number of entries, anything else) and save them as `my-rules.json` from `assets/my-rules.json`, next to their reviews. Don't propose rules or fill in defaults: these are their goals and limits, not TheStrat's, and traders differ. There is no single checklist. Reuse the file on later reviews; ask again only if they want to change it.
 
 Then grade every line against the bars, quoting their words and answering with a number:
 
@@ -74,7 +76,7 @@ Then grade every line against the bars, quoting their words and answering with a
 | Management | adds versus new triggers, the stop versus C1, the exit versus T1 and any higher-timeframe signal still in force |
 | Notes | the feelings named, against the moments in the fills where they would have mattered |
 
-How that reads, for an entry like: *"ES gapped down; shortly after the open we traded into a pocket of liquidity over a lack of liquidity, so I looked long for a reversal. First entry stopped at breakeven. Second went against me, I averaged down when I could have re-entered, and at a loss I took profit on all at the easy liquidity level instead of seeing the higher-timeframe signal in force, so I should have held."* The review checks the type (was there a reversal trigger, and what were the 30m and 60m doing at the first entry), finds the trigger that would have made a re-entry valid and where it was, prices the average-down against that re-entry, and checks the exit: if the 60m was in a 2u above its open when they sold, the checklist marks "Exit by plan: sold with the 60m 2u still in force" and the alternatives show what holding to T1 or trailing would have paid.
+How that reads, for an entry like: *"ES gapped down; shortly after the open we traded into a pocket of liquidity over a lack of liquidity, so I looked long for a reversal. First entry stopped at breakeven. Second went against me, I averaged down when I could have re-entered, and at a loss I took profit on all at the easy liquidity level instead of seeing the higher-timeframe signal in force, so I should have held."* The review checks the type (was there a reversal trigger, and what were the 30m and 60m doing at the first entry), finds the trigger that would have made a re-entry valid and where it was, prices the average-down against that re-entry, and checks the exit: if the 60m was in a 2u above its open when they sold, the chart facts read "Exit: with the 60m 2u still in force" and the alternatives show what holding to T1 or trailing would have paid.
 
 If the trader asks about risk, sizing, discipline or mindset, or the flags show `AVERAGED_DOWN`, `AGAINST_FTFC` or a near-miss on the loss limit, use the `trading-risk-and-mindset` skill for that part if it is installed.
 
@@ -123,7 +125,7 @@ Useful options:
 | `--t1` | auto | override the first target |
 | `--trail-tf` | `60m` | runners trail under each completed bar of this timeframe (a 30m trail tends to stop out a 0DTE runner on normal pullbacks) |
 | `--mark` | last bar | mark time for hold and runner rows (use the close once the day is done) |
-| `--caution-until` | `10:00` | entries before this ET time get `EARLY_SESSION` (`''` turns it off) |
+| `--caution-until` | off | entries before this ET time get `EARLY_SESSION`; set it only if waiting out the open is the trader's own rule |
 | `--session futures` | auto for futures symbols | 18:00 to 17:00 ET sessions; equities use 09:30 to 16:00 |
 | `--triggers-window` | `3` | hours either side of the entry to list triggers (0 = whole session) |
 | `--fetch yfinance --yf-symbol ES=F --interval 1m` | off | download underlying bars instead of `--bars` |
@@ -180,23 +182,28 @@ Rules for the write-up:
 
 ## Step 5: Save it
 
-If the trader keeps a journal, write the entry from `assets/journal-entry-template.md`: their journal answers verbatim at the top, then the fills, the state on each timeframe at each fill, the checklist, the review and the lesson, with `timeframes_*.png` attached. Where they skipped a journal line, ask one question for each decision the checklist marked BAD rather than filling it in for them.
+If the trader keeps a journal, write the entry from `assets/journal-entry-template.md`: their journal answers verbatim at the top, then the fills, the state on each timeframe at each fill, what the chart said, their rules kept or broken, the review and their reflection, with `timeframes_*.png` attached. Where they skipped a journal line, ask one question for each decision the chart facts call into question (a fill with no trigger, an add, an exit with a higher-timeframe signal still in force) rather than filling it in for them.
 
 ## Step 6: Share it (when asked)
 
 ```bash
-python3 scripts/share_post.py --review review_out --lesson "Wait for the 30m trigger." \
-  [--setup "Reversal · 30m F2d-2u"] [--good "..."] [--bad "..."] [--no-dollars] [--handle @name]
+python3 scripts/share_post.py --review review_out --lesson "<their reflection>" \
+  [--setup "Reversal · 30m F2d-2u"] [--rules my-rules.json] [--kept "..."] [--broke "..."] [--no-dollars] [--handle @name]
 ```
 
 It writes to `review_out/share/`:
 
 - `post.md`: the message, under Discord's 2,000-character limit, no tables (Discord does not render them; alternatives go in a code block).
 - `timeframes.png`: the 5m/15m/30m/60m view, the main image.
-- `card.png`: a 1200x675 summary card. It leads with % return on what was paid (options and shares; R for futures), then R, then dollars; grades the trade on a **Strat checklist** (entered on a live trigger, with continuity, no averaging down, exit by plan, let the open settle, inside the loss limit), each marked GOOD or BAD with its evidence; shows the state at entry and what the alternatives would have paid; and puts the lesson in its own band across the bottom. Good and bad use blue and amber with an icon and a label, never green and red, which stay bull and bear.
+- `card.png`: a 1200x675 summary card in three parts that are kept apart on purpose:
+  1. **What the chart said**: facts at each decision, not grades. The setup and timeframe at the first fill and whether its trigger was holding or failing; continuity, and when it was against the trade, whether the setup was a reversal (against continuity, only an exhaustion reversal is a valid entry, so the trader judges whether it was one); each add and whether a new trigger backed it; each exit, whether a higher-timeframe signal was still in force, and where T1 was. Context lines: a gap from the prior close, and on Mondays that the week and the day are the same candle.
+  2. **My rules**: only rules the trader set in `my-rules.json` (or passed as `--kept` / `--broke`), each KEPT or BROKE with its evidence. Rules the data can't check are listed for the trader to answer. With no rules, the section is left off.
+  3. **Reflection**: the trader's lesson, in their words, in the band across the bottom.
+
+  Around them: % return on what was paid (options and shares; R for futures), then R, then dollars; the state at entry; and what the alternatives would have paid. Kept and broke use blue and amber with an icon and a label, never green and red, which stay bull and bear.
 - `chart.png`: the single-timeframe view.
 
-The checklist is graded from the review data. Read each line against your own review; if one is wrong for this trade, replace the checklist with `--good` / `--bad` lines (each repeatable; passing either replaces the drafted checklist). Keep each to one line that names the fill and the timeframe. The lesson is the most prominent text on the card, so make it the one sentence the trader should carry into the next trade. Write the lesson in one sentence, in the trader's words where you can, and pass their type of trade and primary timeframe/combo as `--setup`. Tell the trader to paste the text and attach `timeframes.png` and `card.png` to the same Discord message. `--no-dollars` hides dollar amounts and keeps % and R.
+Read each chart fact against your own review before posting. The reflection is the most prominent text on the card, so use the trader's own words (from the journal's Notes or Management line, or ask for one sentence); don't write it for them unless they ask. Pass their type of trade and primary timeframe/combo as `--setup`. Tell the trader to paste the text and attach `timeframes.png` and `card.png` to the same Discord message. `--no-dollars` hides dollar amounts and keeps % and R.
 
 ## Pitfalls
 

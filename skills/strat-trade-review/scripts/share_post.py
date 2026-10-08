@@ -83,9 +83,28 @@ def cc_token(combo: str) -> str:
 GOOD, BAD = "#5b9cff", "#f5a524"   # status colors for good / bad calls: never green and red, which mean bull and bear
 
 
-def strat_checks(rep: dict, pos: dict) -> list[dict]:
-    """The same six Strat checks for every trade, each graded good or bad with the evidence.
-    A check that the data can't decide (no loss limit given) is left out."""
+TF_MINUTES = {"5m": 5, "15m": 15, "30m": 30, "60m": 60}
+
+
+def setup_at(pos: dict, when: datetime) -> dict | None:
+    """The trigger a fill at `when` was riding: the highest timeframe whose forming bar had broken in the
+    trade's direction by then (a trigger inside the current bar of its timeframe)."""
+    best = None
+    for e in pos.get("triggers", []):
+        if e["dir"] != pos["direction"] or e.get("gap") or e["tf"] not in TF_MINUTES:
+            continue
+        bar_start = datetime.fromisoformat(e["bar_start"])
+        if bar_start <= when < bar_start + timedelta(minutes=TF_MINUTES[e["tf"]]) and \
+                datetime.fromisoformat(e["time"]) <= when:
+            if best is None or TF_MINUTES[e["tf"]] > TF_MINUTES[best["tf"]]:
+                best = e
+    return best
+
+
+def chart_facts(rep: dict, pos: dict) -> list[dict]:
+    """What the chart said at each decision, as facts. Nothing here is graded: whether entering against
+    continuity was right depends on the setup (only an exhaustion reversal justifies it), so the facts
+    name the setup next to the continuity and leave the judgement to the review and the trader."""
     bull = pos["direction"] == "BULL"
     tfs = pos.get("tfs") or [tf for tf in pos["fills"][0]["states"] if tf != "D"]
     side0 = pos["fills"][0]["side"]
@@ -93,89 +112,112 @@ def strat_checks(rep: dict, pos: dict) -> list[dict]:
     exits = [(n, f) for n, f in enumerate(pos["fills"], 1) if f["side"] != side0]
     broke, failed = ("2u", "F2u") if bull else ("2d", "F2d")
     away = "below" if bull else "above"
-    checks = []
+    facts = []
 
-    # 1. on a trigger, and the trigger was holding
-    fails, hits = [], []
-    for n, f in entries:
-        st = f["states"]
-        fl = [tf for tf in tfs if cc_token(st.get(tf, {}).get("combo", "")) == failed]
-        br = [tf for tf in tfs if cc_token(st.get(tf, {}).get("combo", "")) == broke]
-        if fl:
-            fails.append(f"#{n} {fl[0]} break already failing ({failed})")
-        elif br:
-            hits.append(f"#{n} on a {br[0]} {broke} break")
-        else:
-            fails.append(f"#{n} no {broke} break on any timeframe")
-    checks.append(dict(ok=not fails, name="Entered on a live trigger", detail="; ".join(fails or hits)))
+    # context: the open, and Monday's week/day coupling
+    lv = pos.get("levels") or {}
+    day0 = datetime.fromisoformat(pos["fills"][0]["time"])
+    ctx = []
+    if lv.get("day open") and lv.get("prior close (gap fill)"):
+        gap = lv["day open"] / lv["prior close (gap fill)"] - 1
+        if abs(gap) >= 0.002:
+            ctx.append(f"gap {'up' if gap > 0 else 'down'} {abs(gap):.1%} from the prior close")
+    if day0.weekday() == 0:
+        ctx.append("Monday: the week and the day are the same candle")
+    if ctx:
+        facts.append(dict(name="Context", detail="; ".join(ctx)))
 
-    # 2. continuity
-    groups: dict = {}
-    for n, f in entries:
-        against = tuple(tf for tf in tfs if f["states"].get(tf, {}).get("sign") is not None
-                        and f["states"][tf]["sign"] != bull)
-        if len(against) >= 2:
-            groups.setdefault(against, []).append(f"#{n}")
-    checks.append(dict(ok=not groups, name="With timeframe continuity",
-                       detail="; ".join(f"{', '.join(ns)} with {', '.join(a)} {away} their opens"
-                                        for a, ns in groups.items())
-                       or f"{', '.join(tfs)} agreed at entry"))
+    # the entry: which trigger, was it holding, what continuity said
+    n1, f1 = entries[0]
+    t1_ = datetime.fromisoformat(f1["time"])
+    e = setup_at(pos, t1_)
+    st = f1["states"]
+    if e:
+        tok = cc_token(st.get(e["tf"], {}).get("combo", ""))
+        status = (f"failing at the fill ({tok}, back inside)" if tok == failed
+                  else "holding at the fill" if tok == broke else f"{tok} at the fill")
+        facts.append(dict(name=f"#{n1} entry: {e['tf']} {e['combo']}, {e['family']}",
+                          detail=f"trigger {e['trigger']:.2f}, C1 stop {e['stop_c1']:.2f}; {status}"))
+    else:
+        facts.append(dict(name=f"#{n1} entry: no trigger in the forming bar",
+                          detail=f"no {broke} break on {'/'.join(tfs)} when filled"))
+    against = [tf for tf in tfs if st.get(tf, {}).get("sign") is not None and st[tf]["sign"] != bull]
+    if against:
+        rev = e is not None and "Reversal" in e["family"]
+        facts.append(dict(name=f"Continuity at #{n1}: {f1['continuity']}",
+                          detail=f"{', '.join(against)} {away} their opens; "
+                                 + ("a reversal; against continuity it needs exhaustion" if rev
+                                    else "no reversal setup against them")))
+    else:
+        facts.append(dict(name=f"Continuity at #{n1}: {f1['continuity']}", detail=f"{', '.join(tfs)} agreed"))
 
-    # 3. adds
-    worse = [n for n, f in entries[1:] if (f["price"] < entries[0][1]["price"]) == (side0 == "BUY")]
-    checks.append(dict(ok=not worse, name="No averaging down",
-                       detail=(f"#{', #'.join(map(str, worse))} added at a worse price with no new trigger"
-                               if worse else ("adds only on strength" if len(entries) > 1 else "one entry"))))
+    # adds
+    for n, f in entries[1:]:
+        ea = setup_at(pos, datetime.fromisoformat(f["time"]))
+        worse = (f["price"] < f1["price"]) == (side0 == "BUY")
+        facts.append(dict(name=f"#{n} add at {f['price']:g}, {'worse' if worse else 'better'} than #{n1}",
+                          detail=(f"on a {ea['tf']} {ea['combo']} trigger {ea['trigger']:.2f}" if ea
+                                  else "no new trigger; continuity " + f["continuity"])))
 
-    # 4. the exit against the plan: sold on the real trigger, or before the first target
+    # exits
     c = pos.get("clean") or {}
     t1 = pos.get("t1")
-    exit_detail, exit_ok = "", True
-    if c.get("time") and exits:
-        t0 = datetime.fromisoformat(c["time"])
-        mins = timedelta(minutes={"5m": 5, "15m": 15, "30m": 30, "60m": 60}.get(c.get("tf"), 30))
-        on_trigger = [f"#{n}" for n, f in exits if t0 - mins <= datetime.fromisoformat(f["time"]) <= t0 + mins]
-        if on_trigger:
-            exit_ok = False
-            exit_detail = f"{', '.join(on_trigger)} sold on the {c['tf']} {c['event']} trigger, the real entry"
-    if exit_ok and t1 is not None and exits:
-        reached = [n for n, f in exits if f.get("underlying") is not None
-                   and ((f["underlying"] >= t1) if bull else (f["underlying"] <= t1))]
-        # a higher-timeframe signal still in force with the trade at the exit: a 2 (or a failed 2 the other
-        # way) in the trade's direction, forming bar on the trade's side of its open
-        htf = [tf for tf in ("30m", "60m", "D") if tf in pos["fills"][0]["states"]]
-        in_force = []
-        for n, f in exits:
-            for tf in htf:
-                st = f["states"].get(tf, {})
-                if st.get("sign") == bull and cc_token(st.get("combo", "")) in ((broke, "F2d") if bull else (broke, "F2u")):
-                    in_force.append((n, tf, cc_token(st["combo"])))
-                    break
-        if in_force and not reached:
-            n, tf, tok = in_force[0]
-            exit_ok, exit_detail = False, f"#{n} sold with the {tf} {tok} still in force"
-        else:
-            exit_ok = bool(reached) or pos["pnl"] < 0
-            exit_detail = (f"#{reached[0]} out at or past T1 {t1:.2f}" if reached
-                           else ("closed for a loss" if pos["pnl"] < 0 else f"out before T1 {t1:.2f}"))
     if exits:
-        checks.append(dict(ok=exit_ok, name="Exit by plan", detail=exit_detail))
+        ns = ", ".join(f"#{n}" for n, _ in exits)
+        notes = []
+        if c.get("time"):
+            t0 = datetime.fromisoformat(c["time"])
+            mins = timedelta(minutes=TF_MINUTES.get(c.get("tf"), 30))
+            if any(t0 - mins <= datetime.fromisoformat(f["time"]) <= t0 + mins for _, f in exits):
+                notes.append(f"on the {c['tf']} {c['event']} trigger bar, the clean entry")
+        htf = [tf for tf in ("30m", "60m", "D") if tf in pos["fills"][0]["states"]]
+        live = []
+        for _, f in exits:
+            for tf in htf:
+                s_ = f["states"].get(tf, {})
+                if s_.get("sign") == bull and cc_token(s_.get("combo", "")) in ((broke, "F2d") if bull else (broke, "F2u")):
+                    live.append(f"{tf} {cc_token(s_['combo'])}")
+        if live:
+            notes.append(f"with the {', '.join(dict.fromkeys(live))} still in force")
+        if t1 is not None:
+            reached = any(f.get("underlying") is not None and ((f["underlying"] >= t1) if bull else (f["underlying"] <= t1))
+                          for _, f in exits)
+            notes.append(f"{'at or past' if reached else 'before'} T1 {t1:.2f}")
+        facts.append(dict(name=f"Exit {ns}", detail="; ".join(notes)))
+    return facts
 
-    # 5. the open
-    checks.append(dict(ok="EARLY_SESSION" not in pos["flags"], name="Let the open settle",
-                       detail="entered before 10:00 ET" if "EARLY_SESSION" in pos["flags"] else "first entry after 10:00 ET"))
 
-    # 6. the daily loss limit
-    dw, lim = rep.get("day_worst"), rep.get("max_daily_loss")
-    if dw and lim:
+def rule_results(rep: dict, pos: dict, rules: dict) -> list[dict]:
+    """The trader's own rules, from their rules file, each kept or broken. Only rules they set."""
+    out = []
+    side0 = pos["fills"][0]["side"]
+    entries = [(n, f) for n, f in enumerate(pos["fills"], 1) if f["side"] == side0]
+    lim = rules.get("max_daily_loss") or rep.get("max_daily_loss")
+    dw = rep.get("day_worst")
+    if rules.get("max_daily_loss") and dw:
         used = abs(min(dw["pnl"], 0)) / abs(lim)
-        checks.append(dict(ok=used < 0.8, name="Inside the loss limit", detail=f"worst point used {used:.0%} of it"))
-    return checks
+        out.append(dict(ok=used < 1, name=f"Daily loss limit ${abs(lim):,.0f}",
+                        detail=f"worst point {money(dw['pnl'])}, {used:.0%} of it"))
+    if rules.get("no_averaging_down"):
+        worse = [n for n, f in entries[1:] if (f["price"] < entries[0][1]["price"]) == (side0 == "BUY")]
+        out.append(dict(ok=not worse, name="No averaging down",
+                        detail=f"#{', #'.join(map(str, worse))} added at a worse price" if worse else "no adds at a worse price"))
+    if rules.get("no_entries_before"):
+        cut = rules["no_entries_before"]
+        early = [n for n, f in entries if datetime.fromisoformat(f["time"]).strftime("%H:%M") < cut]
+        out.append(dict(ok=not early, name=f"No entries before {cut} ET",
+                        detail=f"#{', #'.join(map(str, early))} before it" if early else "first entry after it"))
+    if rules.get("max_entries"):
+        k = int(rules["max_entries"])
+        out.append(dict(ok=len(entries) <= k, name=f"At most {k} entries per trade", detail=f"{len(entries)} entries"))
+    for r in rules.get("other", []):     # rules the data can't check: listed for the trader to answer
+        out.append(dict(ok=None, name=r, detail=""))
+    return out
 
 
-def custom_checks(goods: list[str] | None, bads: list[str] | None) -> list[dict]:
-    return ([dict(ok=True, name=g, detail="") for g in goods or []]
-            + [dict(ok=False, name=b, detail="") for b in bads or []])
+def custom_rules(kept: list[str] | None, broke: list[str] | None) -> list[dict]:
+    return ([dict(ok=True, name=g, detail="") for g in kept or []]
+            + [dict(ok=False, name=b, detail="") for b in broke or []])
 
 
 def main_position(rep: dict) -> dict:
@@ -189,7 +231,7 @@ def first_fill_context(pos: dict) -> tuple[str, str]:
     return f["continuity"], " | ".join(cells)
 
 
-def build_text(rep: dict, pos: dict, args, checks: list[dict]) -> str:
+def build_text(rep: dict, pos: dict, args, facts: list[dict], rules: list[dict]) -> str:
     risk = (pos.get("clean") or {}).get("risk")
     cost = pos.get("cost") if pos["asset"] != "future" else None
     show_money = not args.no_dollars
@@ -197,16 +239,21 @@ def build_text(rep: dict, pos: dict, args, checks: list[dict]) -> str:
     arrow = "🟢 BULL" if pos["direction"] == "BULL" else "🔴 BEAR"
     head, rest = result_parts(pos, show_money)
     unit = "contracts" if pos["asset"] != "stock" else "shares"
-    good = sum(1 for c in checks if c["ok"])
     lines = [f"**{pos['label']} · {day:%b %-d, %Y}** · {arrow}" + (f" · {args.handle}" if args.handle else "")]
     if args.setup:
         lines.append(f"**Setup:** {args.setup}")
-    lines += [f"**Result: {head}**" + (f" ({', '.join(rest)})" if rest else "") + f" on {pos['qty']:g} {unit}"]
+    lines += [f"**Result: {head}**"
+              + (f" ({', '.join(rest)})" if rest else "") + f" on {pos['qty']:g} {unit}"]
     if args.lesson:
-        lines.append(f"> **Lesson:** {args.lesson}")
-    lines.append(f"**Strat checklist: {good} of {len(checks)} good**")
-    lines += [f"{'✓ Good' if c['ok'] else '✗ Bad'} · {c['name']}" + (f": {c['detail']}" if c["detail"] else "")
-              for c in checks]
+        lines.append(f"> **Reflection:** {args.lesson}")
+    lines.append("**What the chart said**")
+    lines += [f"• {x['name']}" + (f": {x['detail']}" if x["detail"] else "") for x in facts]
+    if rules:
+        kept = sum(1 for r in rules if r["ok"])
+        graded = sum(1 for r in rules if r["ok"] is not None)
+        lines.append(f"**My rules: kept {kept} of {graded}**")
+        lines += [f"{'✓ Kept' if r['ok'] else ('✗ Broke' if r['ok'] is False else '? Your call')} · {r['name']}"
+                  + (f": {r['detail']}" if r["detail"] else "") for r in rules]
     c = pos.get("clean")
     if c and c.get("trigger"):
         lines.append(f"**Clean Strat:** {c['tf']} {c['event']} trigger {c['trigger']:.2f}, C1 stop {c['stop_c1']:.2f}"
@@ -231,7 +278,7 @@ def build_text(rep: dict, pos: dict, args, checks: list[dict]) -> str:
     return text
 
 
-def card(path: Path, rep: dict, pos: dict, args, checks: list[dict]) -> None:
+def card(path: Path, rep: dict, pos: dict, args, facts: list[dict], rules: list[dict]) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -267,21 +314,39 @@ def card(path: Path, rep: dict, pos: dict, args, checks: list[dict]) -> None:
     t(40, 576, head, size=48, weight="bold")
     t(40, 498, "  ·  ".join(rest + [f"{pos['qty']:g} {unit}"]), color=MUTED, size=13)
 
-    # the checklist: same six checks every trade, graded good / bad with icon + label
-    good = sum(1 for c in checks if c["ok"])
-    t(40, 466, "STRAT CHECKLIST", color=MUTED, size=11, weight="bold")
-    t(600, 466, f"{good} of {len(checks)} good", color=FG, size=11, weight="bold", ha="right")
-    y = 436
-    for c in checks[:6]:
-        col = GOOD if c["ok"] else BAD
-        ax.add_patch(Circle((52, y - 9), 10, fc=col, ec="none"))
-        t(52, y - 9, "✓" if c["ok"] else "✗", ha="center", va="center", size=11, weight="bold", color=BG)
-        t(72, y, c["name"], size=12.5, weight="bold")
-        t(600, y, "GOOD" if c["ok"] else "BAD", size=9.5, weight="bold", color=col, ha="right")
-        if c["detail"]:
-            d = c["detail"] if len(c["detail"]) <= 70 else c["detail"][:69] + "…"
-            t(72, y - 19, d, size=10.5, color=MUTED)
-        y -= 44 if c["detail"] else 30
+    # what the chart said: facts at each decision, not graded
+    t(40, 466, "WHAT THE CHART SAID", color=MUTED, size=11, weight="bold")
+    y = 440
+    shown = min(len(rules), 4)
+    room = 5 if not rules else (4 if shown <= 4 else 3)
+    # decisions first (entry, continuity, adds, exit); the context line only if there is room
+    ordered = [x for x in facts if x["name"] != "Context" and not x["name"].startswith("Context")] + \
+              [x for x in facts if x["name"].startswith("Context")]
+    for x in ordered[:room]:
+        ax.add_patch(Circle((50, y - 8), 3.5, fc=MUTED, ec="none"))
+        t(64, y, x["name"], size=12, weight="bold")
+        if x["detail"]:
+            d = x["detail"] if len(x["detail"]) <= 78 else x["detail"][:77] + "…"
+            t(64, y - 17, d, size=10, color=MUTED)
+        y -= 38 if x["detail"] else 26
+
+    # the trader's own rules, kept or broken, only when they set some
+    if rules:
+        kept = sum(1 for r in rules if r["ok"])
+        graded = sum(1 for r in rules if r["ok"] is not None)
+        y -= 6
+        t(40, y, "MY RULES", color=MUTED, size=11, weight="bold")
+        t(600, y, f"kept {kept} of {graded}", color=FG, size=11, weight="bold", ha="right")
+        y -= 26
+        for r in rules[:4]:
+            col = GOOD if r["ok"] else (BAD if r["ok"] is False else MUTED)
+            ax.add_patch(Circle((50, y - 8), 9, fc=col, ec="none"))
+            t(50, y - 8, "✓" if r["ok"] else ("✗" if r["ok"] is False else "?"), ha="center", va="center",
+              size=10, weight="bold", color=BG)
+            t(66, y, r["name"] + (f"  ·  {r['detail']}" if r["detail"] else ""), size=11.5)
+            t(600, y, "KEPT" if r["ok"] else ("BROKE" if r["ok"] is False else "YOUR CALL"), size=9.5, weight="bold",
+              color=col, ha="right")
+            y -= 25
 
     # right panel: state at entry, then the alternatives
     box(650, 150, 510, 432, PANEL)
@@ -313,8 +378,8 @@ def card(path: Path, rep: dict, pos: dict, args, checks: list[dict]) -> None:
     if args.lesson:
         box(40, 30, 1120, 100, "#18213a", 10)
         ax.add_patch(plt.Rectangle((40, 30), 6, 100, color=GOOD))
-        t(66, 118, "LESSON", color=GOOD, size=11, weight="bold")
-        for k, ln in enumerate(textwrap.wrap(args.lesson, 88)[:2]):
+        t(66, 118, "REFLECTION", color=GOOD, size=11, weight="bold")
+        for k, ln in enumerate(textwrap.wrap(args.lesson, 78)[:2]):
             t(66, 94 - k * 30, ln, size=19, weight="bold")
     t(1160, 8, "TheStrat review · 5m / 15m / 30m / 60m · not advice", color=MUTED, size=9, ha="right", va="bottom")
     fig.savefig(path, facecolor=BG)
@@ -324,16 +389,17 @@ def card(path: Path, rep: dict, pos: dict, args, checks: list[dict]) -> None:
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--review", required=True, help="Folder strat_review.py wrote (has review.json)")
-    ap.add_argument("--lesson", help="One sentence: the lesson, in the trader's words if possible")
+    ap.add_argument("--lesson", "--reflection", dest="lesson",
+                    help="The trader's reflection, one or two sentences in their words")
     ap.add_argument("--notes", help="Optional extra line, e.g. what you would do next time")
     ap.add_argument("--handle", help="Optional name or @handle to show")
     ap.add_argument("--setup", help="Type of trade and primary timeframe/combo, e.g. 'Reversal · 30m F2d-2u'")
     ap.add_argument("--no-dollars", "--r-only", dest="no_dollars", action="store_true",
                     help="Show % and R only, no dollar amounts")
-    ap.add_argument("--good", "--pro", dest="good", action="append",
-                    help="A good call, one line (repeatable; with --bad, replaces the drafted checklist)")
-    ap.add_argument("--bad", "--con", dest="bad", action="append",
-                    help="A bad call, one line (repeatable; with --good, replaces the drafted checklist)")
+    ap.add_argument("--rules", help="The trader's rules file (JSON, see assets/my-rules.json); default: my-rules.json "
+                                    "in the review folder or the current folder, if present")
+    ap.add_argument("--kept", action="append", help="A personal rule kept, one line (repeatable; replaces the rules file)")
+    ap.add_argument("--broke", action="append", help="A personal rule broken, one line (repeatable; replaces the rules file)")
     ap.add_argument("--position", type=int, help="Which position to share (1-based); default the largest")
     args = ap.parse_args(argv)
 
@@ -344,15 +410,21 @@ def main(argv=None):
     pos = rep["positions"][args.position - 1] if args.position else main_position(rep)
     out = folder / "share"
     out.mkdir(exist_ok=True)
-    checks = custom_checks(args.good, args.bad) if (args.good or args.bad) else strat_checks(rep, pos)
-    text = build_text(rep, pos, args, checks)
+    facts = chart_facts(rep, pos)
+    if args.kept or args.broke:
+        rules = custom_rules(args.kept, args.broke)
+    else:
+        rp = next((p for p in ([Path(args.rules)] if args.rules else [folder / "my-rules.json", Path("my-rules.json")])
+                   if p.exists()), None)
+        rules = rule_results(rep, pos, json.loads(rp.read_text())) if rp else []
+    text = build_text(rep, pos, args, facts, rules)
     (out / "post.md").write_text(text + "\n")
     made = ["post.md"]
     if pos.get("timeframes_chart") and (folder / pos["timeframes_chart"]).exists():
         shutil.copy(folder / pos["timeframes_chart"], out / "timeframes.png")
         made.append("timeframes.png")
     try:
-        card(out / "card.png", rep, pos, args, checks)
+        card(out / "card.png", rep, pos, args, facts, rules)
         made.append("card.png")
     except ImportError:
         print("matplotlib not installed: skipped card.png")

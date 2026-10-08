@@ -1,0 +1,10 @@
+{
+  "_about": "Your own rules, set once. The share card shows each as kept or broke. Delete any line you don't use. These are yours, not TheStrat's.",
+  "max_daily_loss": 150,
+  "no_averaging_down": true,
+  "no_entries_before": "09:35",
+  "max_entries": 3,
+  "other": [
+    "Stop placed with the entry"
+  ]
+}

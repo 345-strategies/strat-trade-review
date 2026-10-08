@@ -11,3 +11,12 @@ python3 scripts/strat_review.py \
 ```
 
 What it should show: the 10:25 ET buy against a bearish 30m and 60m (and a Day below its open), the add under FTFC Down, the day's worst point about $2 from a -$150 limit, and the 30m F2d-2u trigger at 11:10 ET (the bar the position was sold on) as the clean entry. The prior session is included so the first bars of each timeframe have a C1 to compare with; without it they show `?`. It also writes `timeframes_*.png`, the 5m/15m/30m/60m view with each fill numbered.
+
+To make the share post and card with the sample rules file:
+
+```bash
+python3 scripts/share_post.py --review /tmp/strat_review_example --rules assets/my-rules.json \
+  --setup "Reversal · 30m F2d-2u" --lesson "The 30m F2d-2u was the trade. Wait for the trigger instead of averaging down, then hold to T1."
+```
+
+`example-card.png` is the result: what the chart said at each decision, the sample rules kept or broke, and the reflection.

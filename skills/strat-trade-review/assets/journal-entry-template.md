@@ -12,7 +12,7 @@ exit_at:
 exit_price:        # average across all exits
 pnl:
 status:            # closed | open
-flags: []          # SCALED_IN, AVERAGED_DOWN, SCALED_OUT, AGAINST_CONTINUITY, AGAINST_FTFC, EARLY_SESSION
+flags: []          # SCALED_IN, AVERAGED_DOWN, SCALED_OUT, AGAINST_CONTINUITY, AGAINST_FTFC, EARLY_SESSION (only if set)
 ---
 
 # <Underlying> <contract> <local time> (<ET time>)
@@ -35,9 +35,13 @@ flags: []          # SCALED_IN, AVERAGED_DOWN, SCALED_OUT, AGAINST_CONTINUITY, A
 
 <!-- From review.md: every leg, local time (ET), side, qty, price, net, underlying. -->
 
-## Strat checklist
+## What the chart said
 
-<!-- From share_post.py or the review: each check GOOD or BAD with its evidence. -->
+<!-- Facts at each decision, not grades: the setup and its trigger at #1, continuity (and, if against, whether it was an exhaustion reversal), each add and its trigger, each exit and the signals in force. -->
+
+## My rules
+
+<!-- Only the rules in my-rules.json: each kept or broke, with the evidence. Leave out if none. -->
 
 ## Flags
 
@@ -45,9 +49,9 @@ flags: []          # SCALED_IN, AVERAGED_DOWN, SCALED_OUT, AGAINST_CONTINUITY, A
 
 <!-- Entry, management, exit, alternatives table with its "priced from" column, the clean Strat version. -->
 
-## Lesson
+## Reflection
 
-<!-- One sentence you would tell yourself before the next one. -->
+<!-- In my words: what I'd tell myself before the next one. -->
 
 ## Images
 

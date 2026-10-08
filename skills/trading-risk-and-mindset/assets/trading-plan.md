@@ -19,7 +19,7 @@ One page. Written when calm, followed when not. Review it weekly, change it mont
   1. ______
   2. ______
   3. ______
-- Continuity rule: no entries against full timeframe continuity on ______ ; partial continuity = half size.
+- Continuity rule: against continuity only on an exhaustion reversal; partial continuity = ______ size.
 
 ## Every trade
 
