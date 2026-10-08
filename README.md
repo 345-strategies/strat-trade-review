@@ -24,15 +24,15 @@ Hand an AI assistant your fills and it reviews the trade the way a TheStrat trad
 
 ## Run it
 
-One command works everywhere: `/strat-review SYMBOL [DATE] [LOSS LIMIT]`, then attach your export. Date defaults to today; the number is your daily loss limit.
+One command works everywhere: `/strat-review SYMBOL [DATE]`, then attach your export. Date defaults to today. The review asks once whether you have rules you trade by (a loss limit, max trades, a time cutoff); skip it or add them inline: `/strat-review SPY today, rules: max 3 trades, nothing after 11am`.
 
 | App | Type |
 |---|---|
-| **Claude Code** | `/strat-review SPY today 150`. A real slash command once the plugin (or the `skills/` folders) is installed; `/strat-trade-review:strat-review` if another command shares the name. |
-| **Claude (claude.ai, desktop, mobile)** | `/strat-review SPY today 150` as a message |
-| **ChatGPT, Custom GPT** | `/strat-review SPY today 150` as a message, or tap the conversation starter |
-| **ChatGPT, Skills** | `@strat-trade-review SPY today 150` |
-| **Codex** | `$strat-trade-review SPY today 150` |
+| **Claude Code** | `/strat-review SPY today`. A real slash command once the plugin (or the `skills/` folders) is installed; `/strat-trade-review:strat-review` if another command shares the name. |
+| **Claude (claude.ai, desktop, mobile)** | `/strat-review SPY today` as a message |
+| **ChatGPT, Custom GPT** | `/strat-review SPY today` as a message, or tap the conversation starter |
+| **ChatGPT, Skills** | `@strat-trade-review SPY today` |
+| **Codex** | `$strat-trade-review SPY today` |
 
 Plain English works too: *"Review my SPY calls from today"* and attach your export. Or: *"How many MES should I trade with a $10k account?"*, *"Help me write a trading plan"*, *"Here are my last 30 trades in R, what's my biggest leak?"*
 
@@ -42,7 +42,7 @@ Plain English works too: *"Review my SPY calls from today"* and attach your expo
 - TheStrat state (`C1-CC` combos like `F2d-2u`) and continuity on each timeframe at each fill
 - Flags: scaled in, averaged down, against continuity, against full continuity, early session
 - Every trigger of the session, with stop, target, and whether it worked
-- The day's worst point against your loss limit
+- Your own rules, if you have any, each marked kept or broken
 - Priced alternatives in dollars and R, labeled as real marks or estimates
 - Your journal entry (type of trade, thesis, primary timeframe and combo, what it created or negated, management, notes), graded line by line against the bars
 - **A 5m / 15m / 30m / 60m image with every fill numbered**, the triggers, the clean Strat entry and its C1 stop, and the state on each timeframe at each fill (green candles bull, red bear, bar type labeled underneath)

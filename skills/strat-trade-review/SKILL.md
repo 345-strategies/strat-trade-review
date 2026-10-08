@@ -1,6 +1,6 @@
 ---
 name: strat-trade-review
-description: Review a trade (options, shares or futures) against TheStrat multi-timeframe price action and price better entries, adds and exits. Also runs as the command /strat-review SYMBOL [DATE] [LOSS LIMIT].
+description: Review a trade (options, shares or futures) against TheStrat multi-timeframe price action and price better entries, adds and exits. Also runs as the command /strat-review SYMBOL [DATE].
 ---
 
 # TheStrat trade review
@@ -10,7 +10,7 @@ Use this when someone wants a trade reviewed: "was my entry early", "should I ha
 The output is a short, numbers-first review that answers three questions:
 
 1. **Entry.** Where was the trade relative to TheStrat structure and continuity when it was opened, and where was the real trigger?
-2. **Management.** Adds, average-downs, how close the worst point came to the trader's daily loss limit.
+2. **Management.** Adds, average-downs and the day's worst point, checked against the trader's own rules if they have any.
 3. **Exit.** Where it was closed relative to the triggers and targets, and what the alternatives (hold, runner, scale out at target, roll, shares) would actually have paid.
 
 It ends with a one-paragraph "what you should have done" plan the trader can reuse.
@@ -19,16 +19,22 @@ It ends with a one-paragraph "what you should have done" plan the trader can reu
 
 The review also runs as a one-line command, the same in every app:
 
-`/strat-review SYMBOL [DATE] [LOSS LIMIT] [anything else]`
+`/strat-review SYMBOL [DATE] [anything else]`
 
 Treat a message that starts with `/strat-review`, `@strat-trade-review` or `$strat-trade-review` as this command, and read the words after it:
 
 - **Symbol** (required): an underlying or contract, e.g. `SPY`, `SPY 775C`, `ESZ6`, `MES`. If it is missing, ask for it and nothing else.
 - **Date**: `today` (the default), `yesterday`, a weekday, `10/7` or `2026-10-07`. Resolve it to a trading date in the trader's zone and say which date you used.
-- **Loss limit**: a dollar amount or a bare number after the date (`150`, `$150`) is the daily loss limit (`--max-daily-loss`).
+- **Rules**: anything after `rules:` is the trader's own rules, e.g. `rules: max 3 trades, nothing after 11am, $150 loss limit`. A loss limit among them goes to `--max-daily-loss`.
 - **Anything else**: their stop, plan or a script option in plain words (`entry 15m`, `futures`, `mark at close`). Map it to the matching flag.
 
 Then go straight to Step 1 and ask only for what is still missing, usually the fills.
+
+## Their rules (optional, asked once)
+
+In the same message that asks for the fills, ask one optional question: *"Any rules you trade by? For example a loss limit, max trades, setups you only take, or a time cutoff. Skip if none."* If you already know their rules (from memory or earlier in the conversation), list them in one line and ask whether they still apply instead of asking fresh. Don't block on the answer, and don't suggest rules: there is no single checklist, and these are theirs, not TheStrat's.
+
+With rules, the review gets a short **Your rules** section: each rule, kept or broken, with the fill or time that shows it. A loss limit is checked with `--max-daily-loss`. Without rules, leave the section out and say nothing about limits.
 
 ## Bundled files
 
@@ -77,7 +83,7 @@ Notes:                               (anything else, including how it felt)
 
 Also ask, in the same message, whether they want a Discord post (with dollars, or % and R only).
 
-**Personal rules and goals stay private.** If the trader mentions their own rules or goals (a daily loss limit, no averaging down, a time they wait for), check them in the private review and journal entry only. They never go in the share post or card, and don't propose rules or defaults for them: there is no single checklist, and these are theirs, not TheStrat's.
+**Personal rules and goals stay private.** If the trader mentions their own rules or goals (a daily loss limit, no averaging down, a time they wait for), check them in the private review (the **Your rules** section) and journal entry only. They never go in the share post or card.
 
 Then grade every line against the bars, quoting their words and answering with a number:
 
@@ -93,7 +99,7 @@ Then grade every line against the bars, quoting their words and answering with a
 
 How that reads, for an entry like: *"ES gapped down; shortly after the open we traded into a pocket of liquidity over a lack of liquidity, so I looked long for a reversal. First entry stopped at breakeven. Second went against me, I averaged down when I could have re-entered, and at a loss I took profit on all at the easy liquidity level instead of seeing the higher-timeframe signal in force, so I should have held."* The review checks the type (was there a reversal trigger, and what were the 30m and 60m doing at the first entry), finds the trigger that would have made a re-entry valid and where it was, prices the average-down against that re-entry, and checks the exit: if the 60m was in a 2u above its open when they sold, the chart facts read "Exit: with the 60m 2u still in force" and the alternatives show what holding to T1 or trailing would have paid.
 
-If the trader asks about risk, sizing, discipline or mindset, or the flags show `AVERAGED_DOWN`, `AGAINST_FTFC` or a near-miss on the loss limit, use the `trading-risk-and-mindset` skill for that part if it is installed.
+If the trader asks about risk, sizing, discipline or mindset, or the flags show `AVERAGED_DOWN`, `AGAINST_FTFC` or a near-miss on their loss limit, use the `trading-risk-and-mindset` skill for that part if it is installed.
 
 ## Step 2: Get the bars
 
@@ -161,7 +167,7 @@ What it computes, so you can explain it:
 
 ## Step 4: Write the review
 
-Lead with the net result and the single biggest lesson. Then entry, management, exit, alternatives, and the plan. Keep it to what changes the trader's next trade. Shape that has worked:
+Lead with the net result and the single biggest lesson. Then entry, management, exit, your rules (only if they gave any), alternatives, and the plan. Keep it to what changes the trader's next trade. Shape that has worked:
 
 ```
 Net: +$91.14 on the 4-lot. The biggest lesson: your exit bar was the real entry.
