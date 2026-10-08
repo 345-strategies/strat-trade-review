@@ -4,7 +4,9 @@ Two ways, depending on your plan.
 
 ## A. Skills (if your ChatGPT shows a Skills option)
 
-Upload `dist/strat-trade-review.zip` and `dist/trading-risk-and-mindset.zip`. They are the same `SKILL.md` folders Claude uses.
+Skills are on ChatGPT Business, Enterprise, Healthcare and Edu workspaces. Go to Skills > Create > Upload from your computer and upload `dist/strat-trade-review.zip` and `dist/trading-risk-and-mindset.zip`. They are the same `SKILL.md` folders Claude uses. ChatGPT scans each upload before it can be used.
+
+ChatGPT picks the skill up when you ask for a review. To call it directly, type `@strat-trade-review SPY today 150` (the same arguments as `/strat-review`).
 
 ## B. Custom GPT (works on any plan that can create GPTs)
 
@@ -21,7 +23,10 @@ Upload `dist/strat-trade-review.zip` and `dist/trading-risk-and-mindset.zip`. Th
 
    And from `skills/trading-risk-and-mindset/`: `scripts/risk_calc.py`, `references/risk.md`, `references/mindset.md`, `references/strat-fit.md`.
 5. **Capabilities:** turn on Code Interpreter & Data Analysis.
-6. Save. Share by link if you want others to use it.
+6. **Conversation starters:** `/strat-review SPY today`, `Review my trade from today (I'll attach my export)`, `How many MES can I trade with a $10k account?`
+7. Save. Share by link if you want others to use it.
+
+The GPT understands `/strat-review SYMBOL [DATE] [LOSS LIMIT]` typed as a message. ChatGPT has no real slash commands, so it arrives as text and the instructions treat it as the command.
 
 ### The one limit to know
 

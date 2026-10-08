@@ -14,6 +14,8 @@ root = Path(__file__).resolve().parents[1]
 (root / "dist").mkdir(exist_ok=True)
 
 for src in sorted(p for p in (root / "skills").iterdir() if (p / "SKILL.md").exists()):
+    if "disable-model-invocation: true" in (src / "SKILL.md").read_text():
+        continue  # slash-command-only skills (e.g. strat-review) are for Claude Code; no upload zip
     out = root / "dist" / f"{src.name}.zip"
     files = sorted(
         p for p in src.rglob("*")

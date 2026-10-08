@@ -1,6 +1,6 @@
 ---
 name: strat-trade-review
-description: Review a trade (options, shares or futures) against TheStrat multi-timeframe price action and price better entries, adds and exits.
+description: Review a trade (options, shares or futures) against TheStrat multi-timeframe price action and price better entries, adds and exits. Also runs as the command /strat-review SYMBOL [DATE] [LOSS LIMIT].
 ---
 
 # TheStrat trade review
@@ -14,6 +14,21 @@ The output is a short, numbers-first review that answers three questions:
 3. **Exit.** Where it was closed relative to the triggers and targets, and what the alternatives (hold, runner, scale out at target, roll, shares) would actually have paid.
 
 It ends with a one-paragraph "what you should have done" plan the trader can reuse.
+
+## Command form
+
+The review also runs as a one-line command, the same in every app:
+
+`/strat-review SYMBOL [DATE] [LOSS LIMIT] [anything else]`
+
+Treat a message that starts with `/strat-review`, `@strat-trade-review` or `$strat-trade-review` as this command, and read the words after it:
+
+- **Symbol** (required): an underlying or contract, e.g. `SPY`, `SPY 775C`, `ESZ6`, `MES`. If it is missing, ask for it and nothing else.
+- **Date**: `today` (the default), `yesterday`, a weekday, `10/7` or `2026-10-07`. Resolve it to a trading date in the trader's zone and say which date you used.
+- **Loss limit**: a dollar amount or a bare number after the date (`150`, `$150`) is the daily loss limit (`--max-daily-loss`).
+- **Anything else**: their stop, plan or a script option in plain words (`entry 15m`, `futures`, `mark at close`). Map it to the matching flag.
+
+Then go straight to Step 1 and ask only for what is still missing, usually the fills.
 
 ## Bundled files
 

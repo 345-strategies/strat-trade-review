@@ -16,13 +16,25 @@ Hand an AI assistant your fills and it reviews the trade the way a TheStrat trad
 | Where you use AI | Install |
 |---|---|
 | **Claude (claude.ai, desktop, mobile)** | Download [`strat-trade-review.zip`](https://github.com/natebking/strat-trade-review/raw/main/dist/strat-trade-review.zip) and [`trading-risk-and-mindset.zip`](https://github.com/natebking/strat-trade-review/raw/main/dist/trading-risk-and-mindset.zip), then Settings > Capabilities > Skills > Upload skill for each. Code execution must be on. |
-| **Claude Code** | `/plugin marketplace add natebking/strat-trade-review`, then `/plugin install strat-trade-review@strat-trade-review`. Installs both skills. Or copy the folders in `skills/` into `~/.claude/skills/`. |
+| **Claude Code** | `/plugin marketplace add natebking/strat-trade-review`, then `/plugin install strat-trade-review@strat-trade-review`. Installs both skills and the `/strat-review` command. Or copy the folders in `skills/` into `~/.claude/skills/`. |
 | **ChatGPT, with Skills on your plan** | Upload the same two zips as skills. |
 | **ChatGPT, Custom GPT** | Follow [chatgpt/README.md](chatgpt/README.md): paste the instructions, upload the scripts, turn on Code Interpreter. |
 | **Codex and other agents that read `SKILL.md`** | Copy the folders in `skills/` into the agent's skills folder. |
 | **Just Python** | `python3 skills/strat-trade-review/scripts/strat_review.py --fills my_export.csv --fetch yfinance --yf-symbol SPY --chart` |
 
-Then ask: *"Review my SPY calls from today"* and attach your export. Or: *"How many MES should I trade with a $10k account?"*, *"Help me write a trading plan"*, *"Here are my last 30 trades in R, what's my biggest leak?"*
+## Run it
+
+One command works everywhere: `/strat-review SYMBOL [DATE] [LOSS LIMIT]`, then attach your export. Date defaults to today; the number is your daily loss limit.
+
+| App | Type |
+|---|---|
+| **Claude Code** | `/strat-review SPY today 150`. A real slash command once the plugin (or the `skills/` folders) is installed; `/strat-trade-review:strat-review` if another command shares the name. |
+| **Claude (claude.ai, desktop, mobile)** | `/strat-review SPY today 150` as a message |
+| **ChatGPT, Custom GPT** | `/strat-review SPY today 150` as a message, or tap the conversation starter |
+| **ChatGPT, Skills** | `@strat-trade-review SPY today 150` |
+| **Codex** | `$strat-trade-review SPY today 150` |
+
+Plain English works too: *"Review my SPY calls from today"* and attach your export. Or: *"How many MES should I trade with a $10k account?"*, *"Help me write a trading plan"*, *"Here are my last 30 trades in R, what's my biggest leak?"*
 
 ## What you get
 
