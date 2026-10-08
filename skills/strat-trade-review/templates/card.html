@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="card-size" content="1200x675">
+<title>Strat scorecard card</title>
+<!-- Fonts load from Google Fonts when online; offline, the fallbacks in --font-* are used. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* ===== Customize here: colors, fonts, sizes. Everything below reads these. ===== */
+:root {
+  --bg: #0E0F12;           /* card background */
+  --panel: #16181D;        /* right panel, timeframe tiles */
+  --line: #262A31;
+  --ink: #ECEDEF;          /* main text */
+  --muted: #9AA0A6;        /* labels, details */
+  --faint: #7C828A;        /* footer */
+  --bull: #4caf50;         /* TheStrat Suite 2u: bull side, bullish states */
+  --bear: #f23645;         /* TheStrat Suite 2d: bear side, bearish states */
+  --gain: var(--bull);     /* the headline % on a gain (set to var(--ink) for white) */
+  --loss: var(--bear);     /* the headline % on a loss */
+  --with: #5b9cff;         /* scorecard WITH the chart: never green, which means bull */
+  --against: #f5a524;      /* scorecard AGAINST the chart: never red, which means bear */
+  --reflection-bg: #161D2E;
+  --bar: #6B717A;          /* "if you had" bars */
+  --bar-actual: var(--ink);
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+  --hero-size: 150px;
+}
+/* ===== Layout ===== */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+.card { width: 1200px; height: 675px; padding: 34px 40px 22px; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+.top { display: flex; gap: 36px; height: 462px; }
+.left { width: 540px; display: flex; flex-direction: column; }
+.title-row { display: flex; align-items: center; gap: 14px; }
+.title { font-family: var(--font-display); font-size: 36px; font-weight: 600; letter-spacing: -0.5px; }
+.side { display: flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 6px; color: var(--bg);
+  font-size: 13px; font-weight: 600; letter-spacing: 0.6px; }
+.side.bull { background: var(--bull); } .side.bear { background: var(--bear); }
+.sub { margin-top: 6px; font-size: 15px; color: var(--muted); }
+.label { font-size: 12px; font-weight: 600; letter-spacing: 1.4px; color: var(--muted); text-transform: uppercase; }
+.small-label { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; }
+.hero-label { margin-top: 26px; }
+.hero { font-family: var(--font-display); font-size: var(--hero-size); font-weight: 700; line-height: 0.95;
+  letter-spacing: -5px; margin-top: 4px; white-space: nowrap; }
+.stats { margin-top: 22px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.stat { display: flex; flex-direction: column; gap: 4px; }
+.stat .v { font-family: var(--font-mono); font-size: 22px; font-weight: 500; }
+.entry { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+.entry-head { display: flex; justify-content: space-between; }
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.tile { background: var(--panel); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.tile .tf { font-size: 11px; color: var(--muted); }
+.tile .cb { font-family: var(--font-mono); font-size: 13px; white-space: nowrap; }
+.up { color: var(--bull); } .down { color: var(--bear); }
+.right { flex: 1; min-width: 0; background: var(--panel); border-radius: 14px; padding: 20px 22px;
+  display: flex; flex-direction: column; gap: 12px; }
+.score-head { display: flex; align-items: baseline; justify-content: space-between; }
+.score { font-family: var(--font-display); font-size: 26px; font-weight: 600; }
+.score small { color: var(--muted); font-size: 18px; font-weight: 500; }
+.segs { display: grid; gap: 4px; }
+.seg { height: 6px; border-radius: 3px; background: var(--line); }
+.items { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
+.item { display: flex; gap: 12px; align-items: flex-start; }
+.dot { width: 22px; height: 22px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.item .body { flex: 1; min-width: 0; }
+.item .name-row { display: flex; justify-content: space-between; gap: 8px; }
+.item .name { font-size: 15px; font-weight: 600; }
+.item .tag { font-size: 11px; font-weight: 600; letter-spacing: 1px; white-space: nowrap; }
+.item .detail { font-size: 12.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rule { height: 1px; background: var(--line); margin-top: 4px; }
+.alt-head { display: flex; justify-content: space-between; }
+.alts { display: flex; flex-direction: column; gap: 7px; }
+.alt { display: flex; align-items: center; gap: 10px; }
+.alt .n { width: 150px; font-size: 13px; color: #C9CCD1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alt .track { flex: 1; height: 8px; border-radius: 4px; background: #23262D; position: relative; }
+.alt .fill { position: absolute; top: 0; height: 8px; border-radius: 4px; background: var(--bar); }
+.alt .v { width: 120px; text-align: right; font-family: var(--font-mono); font-size: 13px; color: #C9CCD1; white-space: nowrap; }
+.alt.actual .n, .alt.actual .v { color: var(--ink); font-weight: 600; }
+.alt.actual .fill { background: var(--bar-actual); }
+.reflection { background: var(--reflection-bg); border-radius: 14px; padding: 18px 24px; display: flex; flex-direction: column; gap: 6px; }
+.reflection .label { color: var(--with); }
+.reflection .text { font-family: var(--font-display); font-size: 24px; font-weight: 500; line-height: 1.3; }
+.foot { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); margin-top: auto; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="top">
+    <div class="left">
+      <div class="title-row">
+        <div class="title" id="title"></div>
+        <div class="side" id="side"></div>
+      </div>
+      <div class="sub" id="sub"></div>
+      <div class="label hero-label" id="hero-label"></div>
+      <div class="hero" id="hero"></div>
+      <div class="stats" id="stats"></div>
+      <div class="entry" id="entry">
+        <div class="entry-head small-label"><span>At entry #1</span><span id="entry-cont" style="color: var(--ink)"></span></div>
+        <div class="tiles" id="tiles"></div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="score-head">
+        <div class="label">Strat scorecard</div>
+        <div class="score" id="score"></div>
+      </div>
+      <div class="segs" id="segs"></div>
+      <div class="items" id="items"></div>
+      <div class="rule" id="alt-rule"></div>
+      <div class="alt-head label" id="alt-head"><span>If you had</span><span id="alt-cols"></span></div>
+      <div class="alts" id="alts"></div>
+    </div>
+  </div>
+  <div class="reflection" id="reflection">
+    <div class="label">Reflection</div>
+    <div class="text" id="reflection-text"></div>
+  </div>
+  <div class="foot"><span id="foot-left"></span><span id="foot-right"></span></div>
+</div>
+
+<!-- share_post.py replaces the {} below with the trade's data (see templates/README.md for every field). -->
+<script id="card-data" type="application/json">{}</script>
+<script>
+const D = JSON.parse(document.getElementById('card-data').textContent || '{}');
+const O = D.options || {};
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const ICON = {
+  true: '<svg width="12" height="10" viewBox="0 0 12 10"><path d="M1.5 5.5 L4.5 8.5 L10.5 1.5" stroke="#0E0F12" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  false: '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 2 L8 8 M8 2 L2 8" stroke="#0E0F12" stroke-width="2" stroke-linecap="round"/></svg>',
+  null: '<svg width="10" height="4" viewBox="0 0 10 4"><path d="M1 2 L9 2" stroke="#0E0F12" stroke-width="2" stroke-linecap="round"/></svg>'
+};
+const arrow = (s) => s == null ? '' : (s ? ' ↑' : ' ↓');
+const signCls = (s) => s == null ? '' : (s ? 'up' : 'down');
+
+// header
+$('title').textContent = D.title || '';
+const bull = D.direction !== 'BEAR';
+$('side').className = 'side ' + (bull ? 'bull' : 'bear');
+$('side').innerHTML = (bull ? '<svg width="10" height="9" viewBox="0 0 10 9"><path d="M5 0 L10 9 L0 9 Z" fill="currentColor"/></svg>'
+                            : '<svg width="10" height="9" viewBox="0 0 10 9"><path d="M0 0 L10 0 L5 9 Z" fill="currentColor"/></svg>') + '<span>' + (bull ? 'BULL' : 'BEAR') + '</span>';
+$('sub').textContent = [D.date].concat(D.tags || []).concat(D.handle ? [D.handle] : []).filter(Boolean).join('  ·  ');
+
+// the number
+$('hero-label').textContent = (D.hero && D.hero.label) || '';
+$('hero').textContent = (D.hero && D.hero.value) || '';
+const sgn = (D.hero && D.hero.sign) || 0;
+$('hero').style.color = O.numberColor === 'white' || sgn === 0 ? 'var(--ink)' : (sgn > 0 ? 'var(--gain)' : 'var(--loss)');
+if ((D.hero && D.hero.value || '').length > 6) $('hero').style.fontSize = '118px';
+(D.stats || []).forEach((s) => { const c = el('div', 'stat'); c.append(el('div', 'small-label', s.label), el('div', 'v', s.value)); $('stats').append(c); });
+
+// state at entry
+if (D.entry && D.entry.states) {
+  $('entry-cont').textContent = [D.entry.continuity].concat(D.context || []).filter(Boolean).join('  ·  ');
+  D.entry.states.forEach((s) => { const t = el('div', 'tile'); t.append(el('div', 'tf', s.tf === 'D' ? 'Day' : s.tf), el('div', 'cb ' + signCls(s.sign), s.combo + arrow(s.sign))); $('tiles').append(t); });
+} else { $('entry').hidden = true; }
+
+// scorecard
+const items = (D.score && D.score.items) || [];
+const graded = items.filter((i) => i.ok !== null);
+$('score').innerHTML = graded.filter((i) => i.ok).length + '<small> / ' + graded.length + ' with the chart</small>';
+$('segs').style.gridTemplateColumns = 'repeat(' + Math.max(1, items.length) + ', minmax(0, 1fr))';
+items.forEach((i) => {
+  const col = i.ok === true ? 'var(--with)' : (i.ok === false ? 'var(--against)' : 'var(--muted)');
+  const s = el('div', 'seg'); s.style.background = col; $('segs').append(s);
+  const row = el('div', 'item'); const dot = el('div', 'dot'); dot.style.background = col; dot.innerHTML = ICON[i.ok];
+  const body = el('div', 'body'); const nr = el('div', 'name-row');
+  const tag = el('span', 'tag', i.ok === true ? 'WITH' : (i.ok === false ? 'AGAINST' : 'JUDGMENT')); tag.style.color = col;
+  nr.append(el('span', 'name', i.name), tag); body.append(nr, el('div', 'detail', i.detail || ''));
+  row.append(dot, body); $('items').append(row);
+});
+
+// what the alternatives would have paid, from a zero baseline
+const alts = (D.alternatives || []).slice(0, O.maxAlternatives || 5);
+if (alts.length && O.showAlternatives !== false) {
+  $('alt-cols').textContent = D.altColumns || 'Return · R';
+  const vals = alts.map((a) => a.value || 0), maxPos = Math.max(0, ...vals), maxNeg = Math.max(0, ...vals.map((v) => -v));
+  const span = (maxPos + maxNeg) || 1, zero = maxNeg / span * 100;
+  alts.forEach((a) => {
+    const r = el('div', 'alt' + (a.actual ? ' actual' : '')); const tr = el('div', 'track'); const f = el('div', 'fill');
+    const w = Math.abs(a.value || 0) / span * 100;
+    f.style.left = ((a.value || 0) >= 0 ? zero : zero - w) + '%'; f.style.width = w + '%';
+    tr.append(f); r.append(el('div', 'n', a.label), tr, el('div', 'v', a.text)); $('alts').append(r);
+  });
+} else { ['alt-rule', 'alt-head', 'alts'].forEach((id) => $(id).hidden = true); }
+
+// reflection, in the trader's words
+if (D.reflection) $('reflection-text').textContent = D.reflection; else $('reflection').hidden = true;
+$('foot-left').textContent = D.footer || 'TheStrat scorecard';
+$('foot-right').textContent = 'Not advice';
+</script>
+</body>
+</html>

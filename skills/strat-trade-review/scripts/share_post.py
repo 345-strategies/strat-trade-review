@@ -5,12 +5,16 @@ Writes, next to review.json:
 
   share/post.md     the message text, under Discord's 2,000 character limit, no tables
                     (Discord does not render Markdown tables; the alternatives go in a code block)
+  share/card.json, share/timeframes.json   the data both images are drawn from (see templates/README.md)
   share/card.png        a 1200x675 card shaped like a broker's P/L card: symbol, side, one big % (green gain,
                         red loss; R for futures), average in and out, no dollars and no size; then the Strat
                         scorecard (each decision with or against the chart), the state at entry, the
                         alternatives, and the trader's reflection
   share/timeframes.png  the 5m/15m/30m/60m chart with every fill numbered (the main image)
   share/chart.png       the single-timeframe session chart
+
+Both images are drawn from templates/card.html and templates/timeframes.html with a headless Chrome, Chromium
+or Edge (--templates DIR for your own copies); with no browser, matplotlib draws fallback versions.
 
 Attach timeframes.png and card.png to the message. Personal goals and limits (daily loss limit, rules)
 never go in the share; they belong in the trader's private journal. Dollars appear only in the text, and
@@ -135,9 +139,9 @@ def scorecard(pos: dict) -> list[dict]:
     if e:
         tok = cc_token(st.get(e["tf"], {}).get("combo", ""))
         live = tok != failed
-        items.append(dict(ok=live, name="Entered on a live trigger" if live else "Entered on a failing trigger",
-                          detail=f"#{n1}: {e['tf']} {e['combo']} {e['trigger']:.2f}, C1 {e['stop_c1']:.2f}"
-                                 + ("" if live else f"; {e['tf']} back inside ({tok}) at the fill")))
+        items.append(dict(ok=live, name="Entered on a live trigger" if live else "Entered as the trigger failed",
+                          detail=(f"#{n1} on the {e['tf']} {e['combo']} {e['trigger']:.2f}, C1 {e['stop_c1']:.2f}" if live
+                                  else f"{e['tf']} {e['combo']} {e['trigger']:.2f} had slipped back inside ({tok}) at #{n1}")))
     else:
         items.append(dict(ok=False, name="Entered without a trigger",
                           detail=f"#{n1}: no {broke} break on {'/'.join(tfs)} when filled"))
@@ -148,19 +152,17 @@ def scorecard(pos: dict) -> list[dict]:
         items.append(dict(ok=True, name="With continuity", detail=f"{f1['continuity']}: {', '.join(tfs)} agreed"))
     elif e is not None and "Reversal" in e["family"]:
         items.append(dict(ok=True, name="Against continuity on a reversal",
-                          detail=f"{', '.join(against)} {away} their opens; valid only as an exhaustion reversal"))
+                          detail=f"{' and '.join(against)} {away} their opens; valid only as an exhaustion reversal"))
     else:
         items.append(dict(ok=False, name="Against continuity, no reversal",
                           detail=f"{', '.join(against)} {away} their opens"))
 
     # adds: each on a new trigger
     if entries[1:]:
-        bare = []
-        for n, f in entries[1:]:
-            if not setup_at(pos, datetime.fromisoformat(f["time"])):
-                bare.append(n)
+        bare = [(n, f) for n, f in entries[1:] if not setup_at(pos, datetime.fromisoformat(f["time"]))]
         items.append(dict(ok=not bare, name="Added on new triggers" if not bare else "Added without a trigger",
-                          detail=(f"#{', #'.join(map(str, bare))}: no new trigger" if bare
+                          detail=("; ".join(f"#{n} at {f['price']:g}, no new trigger, continuity {f['continuity']}"
+                                            for n, f in bare) if bare
                                   else f"{len(entries) - 1} add{'s' if len(entries) > 2 else ''}, each on a trigger")))
 
     # exit: at the target, or with nothing still in force for the trade
@@ -177,11 +179,13 @@ def scorecard(pos: dict) -> list[dict]:
                     live.append(f"{tf} {cc_token(s_['combo'])}")
         live = list(dict.fromkeys(live))
         fresh = [x for x in (setup_at(pos, datetime.fromisoformat(f["time"])) for _, f in exits) if x]
-        if fresh:   # a trigger in the trade's direction fired in the bar they sold in
-            x = max(fresh, key=lambda e: TF_MINUTES[e["tf"]])
-            live.insert(0, f"{x['tf']} {x['combo']} trigger {x['trigger']:.2f}")
+        before = f", before T1 {t1:.2f}" if t1 else ""
         if reached:
             items.append(dict(ok=True, name="Exited at the target", detail=f"{ns} at or past T1 {t1:.2f}"))
+        elif fresh:   # a trigger in the trade's direction fired in the bar they sold in
+            x = max(fresh, key=lambda e: TF_MINUTES[e["tf"]])
+            items.append(dict(ok=False, name="Exited into a new trigger",
+                              detail=f"Sold {ns} as the {x['tf']} {x['combo']} {x['trigger']:.2f} triggered{before}"))
         elif live:
             items.append(dict(ok=False, name="Exited with signals in force",
                               detail=f"{ns}: {', '.join(live)} still in force" + (f", before T1 {t1:.2f}" if t1 else "")))
@@ -249,6 +253,107 @@ def build_text(rep: dict, pos: dict, args, items: list[dict]) -> str:
         rows.pop(-2)
         text = "\n".join(lines + ["```", *rows, "```"] + foot)
     return text
+
+
+TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
+
+
+def title_and_tags(rep: dict, pos: dict, setup: str | None) -> tuple[str, list[str]]:
+    """'SPY Oct 07 775C' -> ('SPY 775C', ['0DTE']); other assets keep their label."""
+    day = date.fromisoformat(rep.get("trade_date") or pos["fills"][0]["time"][:10])
+    title, tags = pos["label"], []
+    m = re.match(r"^(\S+) (\w{3} \d{2}) (\S+)$", pos["label"]) if pos["asset"] == "option" else None
+    if m:
+        title = f"{m.group(1)} {m.group(3)}"
+        tags.append("0DTE" if m.group(2) == f"{day:%b %d}" else f"exp {m.group(2)}")
+    if setup:
+        tags.append(setup)
+    return title, tags
+
+
+def hero_of(pos: dict) -> dict:
+    risk = (pos.get("clean") or {}).get("risk")
+    cost = pos.get("cost") if pos["asset"] != "future" else None
+    pnl = pos["pnl"]
+    if cost:
+        value, label = pct_of(pnl, cost), "Return on premium" if pos["asset"] == "option" else "Return"
+    elif risk:
+        value, label = r_of(pnl, risk), "R multiple"
+    else:
+        value, label = money(pnl), "Net"
+    return dict(value=value, label=label, sign=(pnl > 0) - (pnl < 0))
+
+
+def pick_alternatives(pos: dict, n: int = 5) -> list[dict]:
+    """What you did first, then the Strat's own plans (clean entry, T1, scale and trail), then holding."""
+    alts = pos["alternatives"]
+    order = [r"^Actual$", r"^Clean Strat", r"^All .* out at T1", r"^\d+ at T1", r"^Hold all", r"."]
+    out = []
+    for pat in order:
+        for a in alts:
+            if a not in out and re.search(pat, a["plan"]):
+                out.append(a)
+    return out[:n]
+
+
+def card_data(rep: dict, pos: dict, args, items: list[dict]) -> dict:
+    """Everything templates/card.html shows, as plain data (documented in templates/README.md)."""
+    risk = (pos.get("clean") or {}).get("risk")
+    cost = pos.get("cost") if pos["asset"] != "future" else None
+    day = date.fromisoformat(rep.get("trade_date") or pos["fills"][0]["time"][:10])
+    title, tags = title_and_tags(rep, pos, args.setup)
+    hero = hero_of(pos)
+    stats = []
+    if cost and risk:
+        stats.append(dict(label="R multiple", value=r_of(pos["pnl"], risk)))
+    if pos.get("avg_entry"):
+        stats.append(dict(label="Avg in", value=f"{pos['avg_entry']:.2f}"))
+    if pos.get("avg_exit"):
+        stats.append(dict(label="Avg out", value=f"{pos['avg_exit']:.2f}"))
+    f0 = pos["fills"][0]
+    alts = []
+    for a in pick_alternatives(pos, 6):
+        cells = [x for x in (pct_of(a["pnl"], cost), r_of(a["pnl"], risk)) if x] or [money(a["pnl"])]
+        value = a["pnl"] / cost * 100 if cost else (a["pnl"] / risk if risk else a["pnl"])
+        alts.append(dict(label="What you did" if a["plan"] == "Actual" else card_label(a["plan"]),
+                         text="  ".join(cells), value=round(value, 3), actual=a["plan"] == "Actual"))
+    graded = [i for i in items if i["ok"] is not None]
+    return dict(
+        title=title, direction=pos["direction"], date=f"{day:%a %b %-d, %Y}", tags=tags, handle=args.handle or "",
+        hero=hero, stats=stats,
+        entry=dict(continuity=f0["continuity"],
+                   states=[dict(tf=tf, combo=st["combo"].replace("-(new)", "-new"), sign=st.get("sign"))
+                           for tf, st in f0["states"].items()]),
+        context=context_notes(pos),
+        score=dict(with_chart=sum(1 for i in graded if i["ok"]), graded=len(graded), items=items),
+        alternatives=alts, altColumns=" · ".join(h for h, ok in (("Return", bool(cost)), ("R", bool(risk))) if ok) or "Net",
+        reflection=args.lesson or "",
+        footer="TheStrat scorecard  ·  " + " / ".join(pos.get("tfs") or ["5m", "15m", "30m", "60m"]) + ", Day for context",
+        options=dict(numberColor=args.number_color),
+    )
+
+
+def timeframes_data(folder: Path, rep: dict, pos: dict, args, items: list[dict]) -> dict | None:
+    """templates/timeframes.html's data: the review's timeframe view plus the card's header."""
+    src = pos.get("timeframes_data")
+    if not src or not (folder / src).exists():
+        return None
+    d = json.loads((folder / src).read_text())
+    title, tags = title_and_tags(rep, pos, args.setup)
+    risk = (pos.get("clean") or {}).get("risk")
+    hero = hero_of(pos)
+    sub = [r_of(pos["pnl"], risk)] if risk and hero["label"] != "R multiple" else []
+    sub.append(f"Strat score {score_line(items).replace(' of ', ' / ')}")
+    d.update(title=title, tags=tags, handle=args.handle or "", hero=hero, heroSub="  ·  ".join(sub),
+             options=dict(numberColor=args.number_color))
+    return d
+
+
+def template_for(name: str, user_dir: str | None) -> Path:
+    """The trader's own template if they have one, else the built-in one."""
+    if user_dir and (Path(user_dir) / name).exists():
+        return Path(user_dir) / name
+    return TEMPLATES / name
 
 
 def card(path: Path, rep: dict, pos: dict, args, items: list[dict]) -> None:
@@ -361,6 +466,12 @@ def main(argv=None):
                     help="Also show dollar amounts in the post text (the card never shows dollars or size)")
     ap.add_argument("--no-dollars", "--r-only", action="store_true", help=argparse.SUPPRESS)  # the default now
     ap.add_argument("--position", type=int, help="Which position to share (1-based); default the largest")
+    ap.add_argument("--templates", help="Folder with your own card.html / timeframes.html (copies of templates/ you "
+                                        "edited); a file missing there falls back to the built-in one")
+    ap.add_argument("--number-color", choices=["gainloss", "white"], default="gainloss",
+                    help="Headline %%: green gain / red loss (default) or white")
+    ap.add_argument("--engine", choices=["auto", "html", "matplotlib"], default="auto",
+                    help="auto: HTML templates through a headless browser, else matplotlib")
     args = ap.parse_args(argv)
 
     folder = Path(args.review)
@@ -374,14 +485,36 @@ def main(argv=None):
     text = build_text(rep, pos, args, items)
     (out / "post.md").write_text(text + "\n")
     made = ["post.md"]
-    if pos.get("timeframes_chart") and (folder / pos["timeframes_chart"]).exists():
-        shutil.copy(folder / pos["timeframes_chart"], out / "timeframes.png")
-        made.append("timeframes.png")
-    try:
-        card(out / "card.png", rep, pos, args, items)
-        made.append("card.png")
-    except ImportError:
-        print("matplotlib not installed: skipped card.png")
+    cdata = card_data(rep, pos, args, items)
+    tdata = timeframes_data(folder, rep, pos, args, items)
+    (out / "card.json").write_text(json.dumps(cdata, indent=1))
+    if tdata:
+        (out / "timeframes.json").write_text(json.dumps(tdata, indent=1))
+    html_ok = False
+    if args.engine != "matplotlib":
+        try:
+            from render_html import render
+            html_ok = render(template_for("card.html", args.templates), cdata, out / "card.png")
+        except (ImportError, OSError):   # render_html.py or templates/ not shipped alongside (e.g. a Custom GPT)
+            render, html_ok = None, False
+        if html_ok and tdata:
+            html_ok = render(template_for("timeframes.html", args.templates), tdata, out / "timeframes.png")
+        if not html_ok and args.engine == "html":
+            raise SystemExit("No headless Chrome, Chromium or Edge found; set STRAT_CHROME or use --engine matplotlib")
+    if html_ok:
+        made += ["card.png"] + (["timeframes.png"] if tdata else [])
+        if not tdata and pos.get("timeframes_chart") and (folder / pos["timeframes_chart"]).exists():
+            shutil.copy(folder / pos["timeframes_chart"], out / "timeframes.png")   # a review from before templates
+            made.append("timeframes.png")
+    else:   # no browser: the matplotlib versions
+        if pos.get("timeframes_chart") and (folder / pos["timeframes_chart"]).exists():
+            shutil.copy(folder / pos["timeframes_chart"], out / "timeframes.png")
+            made.append("timeframes.png")
+        try:
+            card(out / "card.png", rep, pos, args, items)
+            made.append("card.png")
+        except ImportError:
+            print("matplotlib not installed: skipped card.png")
     if pos.get("chart") and (folder / pos["chart"]).exists():
         shutil.copy(folder / pos["chart"], out / "chart.png")
         made.append("chart.png")

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="card-size" content="1600x1040">
+<title>Strat timeframes card</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* ===== Customize here: colors, fonts, sizes. Everything below reads these. ===== */
+:root {
+  --bg: #0E0F12;
+  --panel: #16181D;
+  --line: #262A31;
+  --ink: #ECEDEF;
+  --muted: #9AA0A6;
+  --faint: #7C828A;
+  --bull: #4caf50;          /* bull candles, bullish states, the BULL side */
+  --bear: #f23645;          /* bear candles, bearish states, the BEAR side */
+  --gain: var(--bull);      /* headline % on a gain (var(--ink) for white) */
+  --loss: var(--bear);
+  --buy: #2f7bff;           /* buy markers */
+  --sell: #ECEDEF;          /* sell markers */
+  --trigger-bull: var(--bull);   /* trigger and entry lines on a bull trade */
+  --trigger-bear: var(--bear);   /* ...and on a bear trade */
+  --stop: #9AA0A6;          /* C1 stop line */
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+.card { width: 1600px; height: 1040px; padding: 28px 32px 20px; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+.head { display: flex; justify-content: space-between; align-items: flex-start; }
+.title-row { display: flex; align-items: center; gap: 14px; }
+.title { font-family: var(--font-display); font-size: 34px; font-weight: 600; letter-spacing: -0.5px; }
+.side { display: flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 6px; color: var(--bg); font-size: 13px; font-weight: 600; letter-spacing: 0.6px; }
+.side.bull { background: var(--bull); } .side.bear { background: var(--bear); }
+.sub { font-size: 15px; color: var(--muted); }
+.legend { display: flex; align-items: center; gap: 22px; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.legend > div { display: flex; align-items: center; gap: 6px; }
+.result { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.hero { font-family: var(--font-display); font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -1.5px; }
+.result .sub2 { font-family: var(--font-mono); font-size: 15px; color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; }
+.panel { background: var(--panel); border-radius: 14px; padding: 14px 18px 10px; display: flex; flex-direction: column; gap: 8px; }
+.ph { display: flex; justify-content: space-between; align-items: baseline; }
+.ph .tf { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+.ph .st { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
+.ph .st b { color: var(--muted); letter-spacing: 1px; }
+.ph .st span { font-family: var(--font-mono); font-size: 13px; }
+.plotrow { display: flex; gap: 8px; }
+.yaxis { position: relative; width: 40px; height: 236px; }
+.yaxis div { position: absolute; right: 0; font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); }
+.plot { position: relative; width: 676px; height: 236px; }
+.plot > div { position: absolute; }
+.kind { width: 34px; text-align: center; font-size: 9px; color: var(--faint); }
+.tline-label { right: 2px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.mark { width: 30px; display: flex; flex-direction: column; align-items: center; gap: 2px; z-index: 3; }
+.mark .t { font-size: 10px; font-weight: 600; padding: 1px 4px; border-radius: 4px; white-space: nowrap; }
+.xaxis { position: relative; width: 676px; height: 16px; margin-left: 48px; }
+.xaxis div { position: absolute; width: 110px; text-align: center; white-space: nowrap; font-size: 10.5px; color: var(--faint); }
+.table { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.tr { display: grid; gap: 8px; padding: 5px 4px; align-items: center; }
+.tr.th { font-size: 11px; font-weight: 600; letter-spacing: 1.1px; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px; text-transform: uppercase; }
+.mono { font-family: var(--font-mono); white-space: nowrap; }
+.up { color: var(--bull); } .down { color: var(--bear); }
+.foot { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); margin-top: auto; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head">
+    <div>
+      <div class="title-row"><div class="title" id="title"></div><div class="side" id="side"></div><div class="sub" id="sub"></div></div>
+      <div class="legend">
+        <div><svg width="12" height="10" viewBox="0 0 12 10"><path d="M6 0 L12 10 L0 10 Z" fill="var(--buy)"/></svg><span>buy, numbered by fill</span></div>
+        <div><svg width="12" height="10" viewBox="0 0 12 10"><path d="M0 0 L12 0 L6 10 Z" fill="var(--sell)"/></svg><span>sell</span></div>
+        <div><div style="width:8px;height:14px;background:var(--bull);border-radius:1px"></div><div style="width:8px;height:14px;background:var(--bear);border-radius:1px"></div><span>bull / bear candle, bar type under it</span></div>
+        <div><div style="width:22px;height:2px;background:var(--trigger)" id="legend-trigger"></div><span>first trigger with the trade</span></div>
+        <div><div style="width:22px;border-top:1.5px dashed var(--stop)"></div><span>C1 stop</span></div>
+      </div>
+    </div>
+    <div class="result" id="result"><div class="hero" id="hero"></div><div class="sub2" id="hero-sub"></div></div>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="table" id="table"></div>
+  <div class="foot"><span>↑ / ↓  the forming bar is above / below its open at the fill. Only bars closed by then are used.</span><span id="foot-right">TheStrat scorecard  ·  Not advice</span></div>
+</div>
+
+<!-- share_post.py replaces the {} below with the trade's data (see templates/README.md). -->
+<script id="card-data" type="application/json">{}</script>
+<script>
+const D = JSON.parse(document.getElementById('card-data').textContent || '{}');
+const O = D.options || {};
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text, style) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (style) e.style.cssText = style; return e; };
+const arrow = (s) => s == null ? '' : (s ? ' ↑' : ' ↓');
+const signCls = (s) => s == null ? '' : (s ? 'up' : 'down');
+const bull = D.direction !== 'BEAR';
+document.documentElement.style.setProperty('--trigger', bull ? 'var(--trigger-bull)' : 'var(--trigger-bear)');
+
+$('title').textContent = D.title || D.label || '';
+$('side').className = 'side ' + (bull ? 'bull' : 'bear');
+$('side').innerHTML = (bull ? '<svg width="10" height="9" viewBox="0 0 10 9"><path d="M5 0 L10 9 L0 9 Z" fill="currentColor"/></svg>'
+  : '<svg width="10" height="9" viewBox="0 0 10 9"><path d="M0 0 L10 0 L5 9 Z" fill="currentColor"/></svg>') + '<span>' + (bull ? 'BULL' : 'BEAR') + '</span>';
+$('sub').textContent = [D.date].concat(D.tags || []).concat(['times ' + (D.tz || 'ET')]).concat(D.handle ? [D.handle] : []).filter(Boolean).join('  ·  ');
+if (D.hero) {
+  $('hero').textContent = D.hero.value;
+  const s = D.hero.sign || 0;
+  $('hero').style.color = O.numberColor === 'white' || s === 0 ? 'var(--ink)' : (s > 0 ? 'var(--gain)' : 'var(--loss)');
+  $('hero-sub').textContent = D.heroSub || '';
+} else { $('result').hidden = true; }
+
+// panels
+const W = 676, H = 236, f1 = (v) => Number(v).toFixed(1);
+(D.panels || []).forEach((p) => {
+  const cs = p.candles, n = cs.length, slot = W / Math.max(1, n);
+  const extra = [].concat((p.marks || []).map((m) => m[3]), p.trigger ? [p.trigger.px] : [], p.clean ? [p.clean.px, p.clean.c1] : []);
+  let lo = Math.min(...cs.map((c) => c[2]), ...extra), hi = Math.max(...cs.map((c) => c[1]), ...extra);
+  const r = (hi - lo) || 1; hi += r * 0.1; lo -= r * 0.16;
+  const y = (v) => H * (hi - v) / (hi - lo);
+  const bw = Math.max(3, Math.min(26, slot * 0.62));
+  const panel = el('div', 'panel');
+  const ph = el('div', 'ph'); const st = el('div', 'st');
+  st.append(el('b', null, 'AT #1'), el('span', signCls(p.state && p.state.sign), ((p.state && p.state.combo) || '-') + arrow(p.state && p.state.sign)));
+  ph.append(el('div', 'tf', p.tf), st);
+  const row = el('div', 'plotrow'), ya = el('div', 'yaxis'), plot = el('div', 'plot');
+  const raw = (hi - lo) / 5, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((k) => k >= raw);
+  const dec = step < 1 ? (step < 0.1 ? 2 : 1) : 0;
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ya.append(el('div', null, v.toFixed(dec), 'top:' + f1(y(v) - 7) + 'px'));
+  const buyBars = new Set((p.marks || []).filter((m) => m[2] === 'BUY').map((m) => m[1]));   // their tag sits where the label would
+  cs.forEach((c, j) => {
+    const [o, h, l, cl, k] = c, x = (j + 0.5) * slot, col = cl > o ? 'var(--bull)' : 'var(--bear)';
+    const top = y(Math.max(o, cl)), bot = y(Math.min(o, cl));
+    plot.append(el('div', null, null, `left:${f1(x - 0.6)}px;top:${f1(y(h))}px;width:1.2px;height:${f1(Math.max(1, y(l) - y(h)))}px;background:${col}`));
+    plot.append(el('div', null, null, `left:${f1(x - bw / 2)}px;top:${f1(top)}px;width:${f1(bw)}px;height:${f1(Math.max(1.5, bot - top))}px;background:${col};border-radius:1.5px`));
+    // bar type under each candle; skipped when bars are under ~13px apart (too dense to read)
+    if (O.barTypes !== false && slot >= 13 && !buyBars.has(j)) plot.append(el('div', 'kind', k, `left:${f1(x - 17)}px;top:${f1(y(l) + 3)}px`));
+  });
+  if (p.trigger) {
+    const t = p.trigger;
+    plot.append(el('div', null, null, `left:${f1(t.j * slot)}px;top:${f1(y(t.px))}px;width:${f1(W - t.j * slot)}px;height:1.5px;background:var(--trigger)`));
+    plot.append(el('div', 'tline-label', t.label, `top:${f1(y(t.px) - 17)}px;color:var(--trigger)`));
+  }
+  if (p.clean) {
+    const c = p.clean;
+    plot.append(el('div', null, null, `left:${f1(c.j * slot)}px;top:${f1(y(c.px) - 1)}px;width:${f1(W - c.j * slot)}px;height:2.5px;background:var(--trigger)`));
+    plot.append(el('div', 'tline-label', c.label, `top:${f1(y(c.px) - 19)}px;color:var(--trigger);font-weight:600;font-size:11.5px`));
+    const sj = Math.max(0, c.j - 1);
+    plot.append(el('div', null, null, `left:${f1(sj * slot)}px;top:${f1(y(c.c1))}px;width:${f1(W - sj * slot)}px;border-top:1.5px dashed var(--stop)`));
+    plot.append(el('div', 'tline-label', c.slabel, `top:${f1(y(c.c1) + 3)}px;color:var(--stop);font-size:10.5px`));
+  }
+  const groups = {};
+  (p.marks || []).forEach(([num, j, side, u]) => { const key = j + side; (groups[key] = groups[key] || { j, side, nums: [], us: [] }); groups[key].nums.push(num); groups[key].us.push(u); });
+  Object.values(groups).forEach((g) => {
+    const u = g.us.reduce((a, b) => a + b, 0) / g.us.length, x = (g.j + 0.5) * slot, buy = g.side === 'BUY';
+    const m = el('div', 'mark', null, `left:${f1(x - 15)}px;top:${f1(buy ? y(u) + 1 : y(u) - 31)}px`);
+    const tri = buy ? '<svg width="12" height="10" viewBox="0 0 12 10"><path d="M6 0 L12 10 L0 10 Z" fill="var(--buy)" stroke="var(--bg)" stroke-width="1"/></svg>'
+                    : '<svg width="12" height="10" viewBox="0 0 12 10"><path d="M0 0 L12 0 L6 10 Z" fill="var(--sell)" stroke="var(--bg)" stroke-width="1"/></svg>';
+    const tag = el('div', 't', '#' + g.nums.join(','), buy ? 'background:var(--buy);color:#fff' : 'background:var(--sell);color:var(--bg)');
+    if (buy) { m.innerHTML = tri; m.append(tag); } else { m.append(tag); m.insertAdjacentHTML('beforeend', tri); }
+    plot.append(m);
+  });
+  row.append(ya, plot);
+  const xa = el('div', 'xaxis'), every = Math.max(1, Math.round(n / (String(cs[0] && cs[0][5]).length > 6 ? 5 : 6)));
+  cs.forEach((c, j) => { if (j % every === 0) xa.append(el('div', null, c[5], `left:${f1(Math.min(W - 100, Math.max(-30, (j + 0.5) * slot - 55)))}px`)); });
+  panel.append(ph, row, xa);
+  $('grid').append(panel);
+});
+
+// the state at each fill on every timeframe
+const cols = (D.tfs || []).concat(D.ctx_tfs || []);
+const tmpl = `34px 210px 150px 104px repeat(${cols.length}, minmax(0, 1fr)) 130px`;
+const th = el('div', 'tr th'); th.style.gridTemplateColumns = tmpl;
+['#', 'Fill time', O.showQty ? 'Side qty @ price' : 'Side @ price', D.underlying || 'Underlying'].concat(cols.map((c) => c === 'D' ? 'Day' : c)).concat(['Continuity']).forEach((h) => th.append(el('span', null, h)));
+$('table').append(th);
+const rows = D.fills || [], maxRows = O.maxFillRows || 6;
+rows.slice(0, maxRows).forEach((f) => {
+  const tr = el('div', 'tr'); tr.style.gridTemplateColumns = tmpl;
+  tr.append(el('span', null, String(f.n), 'font-weight:600'), el('span', null, f.time),
+    el('span', 'mono', f.side + (O.showQty ? ' ' + f.qty : '') + ' @ ' + f.price), el('span', 'mono', f.und != null ? Number(f.und).toFixed(2) : '-'));
+  f.states.forEach((s) => tr.append(el('span', 'mono ' + signCls(s.sign), s.combo + arrow(s.sign))));
+  tr.append(el('span', null, f.continuity));
+  $('table').append(tr);
+});
+if (rows.length > maxRows) $('table').append(el('div', null, '+' + (rows.length - maxRows) + ' more fills in the review', 'font-size:12px;color:var(--muted);padding:2px 4px'));
+</script>
+</body>
+</html>

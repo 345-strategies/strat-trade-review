@@ -19,4 +19,4 @@ python3 scripts/share_post.py --review /tmp/strat_review_example \
   --setup "Reversal · 30m F2d-2u" --lesson "The 30m F2d-2u was the trade. Wait for the trigger instead of averaging down, then hold to T1."
 ```
 
-`example-card.png` is the result: +25% in the broker-card style, the Strat scorecard (1 of 4: entered as the 15m trigger was failing, the reversal against continuity, an add with no trigger, the exit on the 30m F2d-2u trigger bar), and the reflection.
+`example-card.png` and `example-timeframes.png` are the result, drawn from `templates/` (with Chrome, Chromium or Edge installed; otherwise matplotlib versions): +25% in the broker-card style, the Strat scorecard (1 of 4: entered as the 15m trigger was failing, the reversal against continuity, an add with no trigger, the exit on the 30m F2d-2u trigger bar), and the reflection.

@@ -1175,12 +1175,15 @@ def run(args):
             else:
                 mpath = out / f"timeframes_{pi}_{re.sub(r'[^A-Za-z0-9]+', '_', inst.label())}.png"
                 cost = sum(abs(pos.net(f)) for f in entries)
-                extra = (f"{pos.direction}  ·  net {money(actual)}"
-                         + (f" ({actual / cost:+.0%} on {money(cost).lstrip('-+')} paid)"
-                            if cost and inst.asset != "future" else "")
-                         )
+                extra = (pos.direction + (f"  ·  {actual / cost:+.0%} on premium paid"
+                                          if cost and inst.asset != "future" else ""))   # no dollars on shared images
                 mtf_chart(mpath, bars, sess, s0, pos, fill_states, all_events, clean, clock, tfs, ctx_tfs, extra)
                 report["positions"][-1]["timeframes_chart"] = mpath.name
+            # the same view as data, for the HTML templates (share_post.py renders them)
+            dpath = out / f"timeframes_{pi}_{re.sub(r'[^A-Za-z0-9]+', '_', inst.label())}.json"
+            dpath.write_text(json.dumps(mtf_data(bars, sess, s0, pos, fill_states, all_events, clean, clock,
+                                                 tfs, ctx_tfs), indent=1))
+            report["positions"][-1]["timeframes_data"] = dpath.name
 
     # whole-day P/L curve across every position (for daily loss limits)
     day_worst = None
@@ -1444,6 +1447,69 @@ def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs,
              color=MUTED, fontsize=8, transform=tab.transAxes, va="bottom")
     fig.savefig(path, facecolor=BG)
     plt.close(fig)
+
+
+def mtf_data(bars, sess, s0, pos, fill_states, events, clean, clock, tfs, ctx_tfs) -> dict:
+    """The multi-timeframe view as plain data: per timeframe the candles in view (o, h, l, c, bar type, time),
+    the fills on it, the first trigger with the trade and the clean entry with its C1 stop, plus the state
+    table at each fill. templates/timeframes.html draws it; no prices are invented here, only selected."""
+    fills = [f for f, _, _ in fill_states]
+    first_t, last_t = fills[0].time, fills[-1].time
+    panels = []
+    for tf in tfs[:4]:
+        agg = aggregate(bars, tf, sess)
+        idx0 = next((i for i, b in enumerate(agg) if sess.start_of(b.start) == s0), None)
+        if idx0 is None:
+            continue
+        sb = [b for b in agg if sess.start_of(b.start) == s0]
+        prev0 = agg[idx0 - 1] if idx0 > 0 else None
+        step = timedelta(minutes=TF_MIN[tf])
+        lo_t, hi_t = sb[0].start, sb[-1].start + step
+        if len(sb) > 40:   # zoom the fast timeframe to the trade
+            lo_t = max(lo_t, first_t - 12 * step)
+            hi_t = min(hi_t, last_t + 18 * step)
+        view = [(i, b) for i, b in enumerate(sb) if lo_t <= b.start < hi_t]
+        candles = []
+        for i, b in view:
+            prev = sb[i - 1] if i > 0 else prev0
+            kind = token(b, prev) if prev else "?"
+            kind = kind.rstrip("ud") if kind[0] in "13" else kind
+            candles.append([round(b.open, 4), round(b.high, 4), round(b.low, 4), round(b.close, 4), kind,
+                            clock.fmt(b.start).split(" (")[0].replace(f" {clock.abbr}", "")])
+
+        def x_of(t):
+            return next((j for j, (i, b) in enumerate(view) if b.start <= t < b.start + step), None)
+
+        marks = [[n, x_of(f.time), "BUY" if f.sign > 0 else "SELL", round(f.und, 4)]
+                 for n, f in enumerate(fills, 1) if f.und is not None and x_of(f.time) is not None]
+        trig = cl = None
+        if clean and clean["event"]["tf"] == tf:
+            e = clean["event"]
+            j = x_of(e["time"])
+            if j is not None:
+                cl = dict(j=j, px=e["trigger"], c1=e["stop_c1"], combo=e["combo"],
+                          label=f"Strat entry {e['combo']} {e['trigger']:.2f} · {clock.fmt(e['time']).split(' (')[0]}",
+                          slabel=f"C1 stop {e['stop_c1']:.2f}")
+        else:
+            nxt = [e for e in events if e["tf"] == tf and not e.get("gap") and e["dir"] == pos.direction
+                   and e["time"] >= first_t - step]
+            j = x_of(nxt[0]["time"]) if nxt else None
+            if j is not None:
+                e = nxt[0]
+                trig = dict(j=j, px=e["trigger"], combo=e["combo"],
+                            label=f"{tf} trigger {e['combo']} {e['trigger']:.2f} · {clock.fmt(e['time']).split(' (')[0]}")
+        st0 = fill_states[0][1].get(tf, {})
+        panels.append(dict(tf=tf, state=dict(combo=st0.get("combo", "-").replace("-(new)", "-new"), sign=st0.get("sign")),
+                           candles=candles, marks=marks, trigger=trig, clean=cl))
+    rows = []
+    for n, (f, st, cont) in enumerate(fill_states, 1):
+        rows.append(dict(n=n, time=clock.fmt(f.time), side="BUY" if f.sign > 0 else "SELL", qty=f.qty, price=f.price,
+                         und=f.und, continuity=cont,
+                         states=[dict(tf=c, combo=st.get(c, {}).get("combo", "-").replace("-(new)", "-new"),
+                                      sign=st.get(c, {}).get("sign")) for c in tfs + ctx_tfs]))
+    return dict(underlying=pos.inst.underlying, label=pos.inst.label(), direction=pos.direction,
+                date=f"{first_t.astimezone(ET):%a %b %-d, %Y}", tz=clock.abbr, tfs=tfs, ctx_tfs=ctx_tfs,
+                panels=panels, fills=rows)
 
 
 # ----------------------------------------------------------------------------- cli

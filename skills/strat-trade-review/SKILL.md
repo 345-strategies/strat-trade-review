@@ -17,7 +17,7 @@ It ends with a one-paragraph "what you should have done" plan the trader can reu
 
 ## Bundled files
 
-This skill ships with `scripts/strat_review.py`, `scripts/import_fills.py`, `scripts/share_post.py`, `references/` (strat-primer, data-sources, connect-and-import), `assets/journal-entry-template.md` and a worked example in `examples/`. If they are not next to this file, get them from github.com/natebking/strat-trade-review (the `skills/strat-trade-review/` folder).
+This skill ships with `scripts/strat_review.py`, `scripts/import_fills.py`, `scripts/share_post.py`, `scripts/render_html.py`, `templates/` (the share card designs), `references/` (strat-primer, data-sources, connect-and-import), `assets/journal-entry-template.md` and a worked example in `examples/`. If they are not next to this file, get them from github.com/natebking/strat-trade-review (the `skills/strat-trade-review/` folder).
 
 ## Conventions (do not drift from these)
 
@@ -188,13 +188,15 @@ If the trader keeps a journal, write the entry from `assets/journal-entry-templa
 
 ```bash
 python3 scripts/share_post.py --review review_out --lesson "<their reflection>" \
-  [--setup "Reversal · 30m F2d-2u"] [--dollars] [--handle @name]
+  [--setup "Reversal · 30m F2d-2u"] [--dollars] [--handle @name] [--number-color white] [--templates my-cards/]
 ```
+
+The two images are drawn from the HTML templates in `templates/` (`card.html`, `timeframes.html`) with a headless Chrome, Chromium or Edge, at 2x for phones; with no browser (for example in a sandbox without one) it falls back to matplotlib versions of the same cards. If the trader wants their own look, point them to `templates/README.md`: copy the folder, change the colors and fonts at the top of each file or the layout itself, and pass `--templates` with their folder. `share/card.json` and `share/timeframes.json` hold the data, so `scripts/render_html.py` can re-render an edited template without re-running the review.
 
 It writes to `review_out/share/`:
 
 - `post.md`: the message, under Discord's 2,000-character limit, no tables (Discord does not render them; alternatives go in a code block).
-- `timeframes.png`: the 5m/15m/30m/60m view, the main image.
+- `timeframes.png`: the 5m/15m/30m/60m view, the main image: every fill numbered (blue buys, white sells), the bar type under each candle, the first trigger with the trade on each timeframe, the Strat entry and its C1 stop, and the state on each timeframe at each fill. No dollars and no position size.
 - `card.png`: a 1200x675 card laid out like a broker's P/L share card (symbol and side, one big number, average in and out), with a Strat scorecard where a broker puts its referral code:
   - **The number:** % return on what was paid (options and shares; R for futures), green for a gain and red for a loss, with R and the average in and out under it. No dollars and no position size on the card, ever.
   - **Strat scorecard:** each decision marked WITH or AGAINST the chart, scored "n of m". Entered on a live trigger (not one already back inside); with continuity, or against it only on a reversal (valid only as an exhaustion reversal, which the trader judges); each add on a new trigger; the exit at T1, or AGAINST when a trigger in the trade's direction or a 30m/60m/Day signal was still in force. An exit before T1 with nothing in force is marked JUDGMENT and not scored. Context, not scored: a gap at the open, and Mondays (the week and the day are the same candle). Nothing personal: no loss limits, goals or rules.
