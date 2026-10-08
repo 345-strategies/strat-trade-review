@@ -56,7 +56,7 @@ Use `references/mindset.md` to name the pattern, show the evidence from their tr
 
 Fill `assets/trading-plan.md` with them: risk per trade, daily and weekly stops, max trades per day, the setups they take (TheStrat combos and timeframes), the pre-trade checklist, and what they do after a loss. Keep it to one page. Plans that need re-reading during a trade don't get followed.
 
-The rules they choose are theirs, and they differ from trader to trader; there is no single checklist. Keep their personal rules (loss limits, goals, habits like no averaging down) separate from what the chart says, and save the ones a review can check in `my-rules.json` (the format is in `strat-trade-review/assets/my-rules.json`) so each review card marks them kept or broke.
+The rules they choose are theirs, and they differ from trader to trader; there is no single checklist. Keep their personal rules (loss limits, goals, habits like no averaging down) separate from what the chart says,. They are private: track them in the trader's own journal, never on a share card or post.
 
 ## Defaults when the trader has none
 

@@ -62,7 +62,7 @@ Notes:                               (anything else, including how it felt)
 
 Also ask, in the same message, whether they want a Discord post (with dollars, or % and R only).
 
-**Their rules, once.** The first time, ask what personal rules they hold themselves to (a daily loss limit, no averaging down, no entries before a time, a maximum number of entries, anything else) and save them as `my-rules.json` from `assets/my-rules.json`, next to their reviews. Don't propose rules or fill in defaults: these are their goals and limits, not TheStrat's, and traders differ. There is no single checklist. Reuse the file on later reviews; ask again only if they want to change it.
+**Personal rules and goals stay private.** If the trader mentions their own rules or goals (a daily loss limit, no averaging down, a time they wait for), check them in the private review and journal entry only. They never go in the share post or card, and don't propose rules or defaults for them: there is no single checklist, and these are theirs, not TheStrat's.
 
 Then grade every line against the bars, quoting their words and answering with a number:
 
@@ -182,28 +182,28 @@ Rules for the write-up:
 
 ## Step 5: Save it
 
-If the trader keeps a journal, write the entry from `assets/journal-entry-template.md`: their journal answers verbatim at the top, then the fills, the state on each timeframe at each fill, what the chart said, their rules kept or broken, the review and their reflection, with `timeframes_*.png` attached. Where they skipped a journal line, ask one question for each decision the chart facts call into question (a fill with no trigger, an add, an exit with a higher-timeframe signal still in force) rather than filling it in for them.
+If the trader keeps a journal, write the entry from `assets/journal-entry-template.md`: their journal answers verbatim at the top, then the fills, the state on each timeframe at each fill, the Strat scorecard, any personal rules they asked to track (private), the review and their reflection, with `timeframes_*.png` attached. Where they skipped a journal line, ask one question for each line the scorecard marks AGAINST rather than filling it in for them.
 
 ## Step 6: Share it (when asked)
 
 ```bash
 python3 scripts/share_post.py --review review_out --lesson "<their reflection>" \
-  [--setup "Reversal · 30m F2d-2u"] [--rules my-rules.json] [--kept "..."] [--broke "..."] [--no-dollars] [--handle @name]
+  [--setup "Reversal · 30m F2d-2u"] [--dollars] [--handle @name]
 ```
 
 It writes to `review_out/share/`:
 
 - `post.md`: the message, under Discord's 2,000-character limit, no tables (Discord does not render them; alternatives go in a code block).
 - `timeframes.png`: the 5m/15m/30m/60m view, the main image.
-- `card.png`: a 1200x675 summary card in three parts that are kept apart on purpose:
-  1. **What the chart said**: facts at each decision, not grades. The setup and timeframe at the first fill and whether its trigger was holding or failing; continuity, and when it was against the trade, whether the setup was a reversal (against continuity, only an exhaustion reversal is a valid entry, so the trader judges whether it was one); each add and whether a new trigger backed it; each exit, whether a higher-timeframe signal was still in force, and where T1 was. Context lines: a gap from the prior close, and on Mondays that the week and the day are the same candle.
-  2. **My rules**: only rules the trader set in `my-rules.json` (or passed as `--kept` / `--broke`), each KEPT or BROKE with its evidence. Rules the data can't check are listed for the trader to answer. With no rules, the section is left off.
-  3. **Reflection**: the trader's lesson, in their words, in the band across the bottom.
+- `card.png`: a 1200x675 card laid out like a broker's P/L share card (symbol and side, one big number, average in and out), with a Strat scorecard where a broker puts its referral code:
+  - **The number:** % return on what was paid (options and shares; R for futures), green for a gain and red for a loss, with R and the average in and out under it. No dollars and no position size on the card, ever.
+  - **Strat scorecard:** each decision marked WITH or AGAINST the chart, scored "n of m". Entered on a live trigger (not one already back inside); with continuity, or against it only on a reversal (valid only as an exhaustion reversal, which the trader judges); each add on a new trigger; the exit at T1, or AGAINST when a trigger in the trade's direction or a 30m/60m/Day signal was still in force. An exit before T1 with nothing in force is marked JUDGMENT and not scored. Context, not scored: a gap at the open, and Mondays (the week and the day are the same candle). Nothing personal: no loss limits, goals or rules.
+  - **At entry** state on each timeframe, **If you had** alternatives in % and R, and the trader's **Reflection** in the band across the bottom.
 
-  Around them: % return on what was paid (options and shares; R for futures), then R, then dollars; the state at entry; and what the alternatives would have paid. Kept and broke use blue and amber with an icon and a label, never green and red, which stay bull and bear.
+  WITH and AGAINST use blue and amber with an icon and a label; green and red are only the bull/bear side, the timeframe states, and the headline gain or loss.
 - `chart.png`: the single-timeframe view.
 
-Read each chart fact against your own review before posting. The reflection is the most prominent text on the card, so use the trader's own words (from the journal's Notes or Management line, or ask for one sentence); don't write it for them unless they ask. Pass their type of trade and primary timeframe/combo as `--setup`. Tell the trader to paste the text and attach `timeframes.png` and `card.png` to the same Discord message. `--no-dollars` hides dollar amounts and keeps % and R.
+Read each scorecard line against your own review before posting. The reflection is the most prominent text on the card, so use the trader's own words (from the journal's Notes or Management line, or ask for one sentence); don't write it for them unless they ask. Pass their type of trade and primary timeframe/combo as `--setup`. Tell the trader to paste the text and attach `timeframes.png` and `card.png` to the same Discord message. The post shows % and R only; `--dollars` adds dollar amounts to the text (never to the card).
 
 ## Pitfalls
 

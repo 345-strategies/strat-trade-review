@@ -35,13 +35,13 @@ flags: []          # SCALED_IN, AVERAGED_DOWN, SCALED_OUT, AGAINST_CONTINUITY, A
 
 <!-- From review.md: every leg, local time (ET), side, qty, price, net, underlying. -->
 
-## What the chart said
+## Strat scorecard
 
-<!-- Facts at each decision, not grades: the setup and its trigger at #1, continuity (and, if against, whether it was an exhaustion reversal), each add and its trigger, each exit and the signals in force. -->
+<!-- From share_post.py: each decision WITH or AGAINST the chart (live trigger, continuity or an exhaustion reversal, adds on new triggers, exit at T1 or with signals in force). -->
 
-## My rules
+## My rules and goals (private, never shared)
 
-<!-- Only the rules in my-rules.json: each kept or broke, with the evidence. Leave out if none. -->
+<!-- Only if I track any: each kept or broke, with the evidence. -->
 
 ## Flags
 

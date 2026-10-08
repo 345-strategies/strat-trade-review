@@ -15,8 +15,8 @@ What it should show: the 10:25 ET buy against a bearish 30m and 60m (and a Day b
 To make the share post and card with the sample rules file:
 
 ```bash
-python3 scripts/share_post.py --review /tmp/strat_review_example --rules assets/my-rules.json \
+python3 scripts/share_post.py --review /tmp/strat_review_example \
   --setup "Reversal · 30m F2d-2u" --lesson "The 30m F2d-2u was the trade. Wait for the trigger instead of averaging down, then hold to T1."
 ```
 
-`example-card.png` is the result: what the chart said at each decision, the sample rules kept or broke, and the reflection.
+`example-card.png` is the result: +25% in the broker-card style, the Strat scorecard (1 of 4: entered as the 15m trigger was failing, the reversal against continuity, an add with no trigger, the exit on the 30m F2d-2u trigger bar), and the reflection.
