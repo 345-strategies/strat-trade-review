@@ -23,4 +23,4 @@ The ideas in this skill are paraphrased, not quoted. These are the places to go 
 
 ## TheStrat
 
-- **Rob Smith**, who created TheStrat, and the **TheStrat Suite** grammar (github.com/natebking/thestrat-suite) used by `strat-trade-review` for bar types, combos and continuity.
+- **Rob Smith**, who created TheStrat, and the **TheStrat Suite** grammar (github.com/345-strategies/thestrat-suite) used by `strat-trade-review` for bar types, combos and continuity.

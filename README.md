@@ -15,8 +15,8 @@ Hand an AI assistant your fills and it reviews the trade the way a TheStrat trad
 
 | Where you use AI | Install |
 |---|---|
-| **Claude (claude.ai, desktop, mobile)** | Download [`strat-trade-review.zip`](https://github.com/natebking/strat-trade-review/raw/main/dist/strat-trade-review.zip) and [`trading-risk-and-mindset.zip`](https://github.com/natebking/strat-trade-review/raw/main/dist/trading-risk-and-mindset.zip), then Settings > Capabilities > Skills > Upload skill for each. Code execution must be on. |
-| **Claude Code** | `/plugin marketplace add natebking/strat-trade-review`, then `/plugin install strat-trade-review@strat-trade-review`. Installs both skills and the `/strat-review` command. Or copy the folders in `skills/` into `~/.claude/skills/`. |
+| **Claude (claude.ai, desktop, mobile)** | Download [`strat-trade-review.zip`](https://github.com/345-strategies/strat-trade-review/raw/main/dist/strat-trade-review.zip) and [`trading-risk-and-mindset.zip`](https://github.com/345-strategies/strat-trade-review/raw/main/dist/trading-risk-and-mindset.zip), then Settings > Capabilities > Skills > Upload skill for each. Code execution must be on. |
+| **Claude Code** | `/plugin marketplace add 345-strategies/strat-trade-review`, then `/plugin install strat-trade-review@strat-trade-review`. Installs both skills and the `/strat-review` command. Or copy the folders in `skills/` into `~/.claude/skills/`. |
 | **ChatGPT, with Skills on your plan** | Upload the same two zips as skills. |
 | **ChatGPT, Custom GPT** | Follow [chatgpt/README.md](chatgpt/README.md): paste the instructions, upload the scripts, turn on Code Interpreter. |
 | **Codex and other agents that read `SKILL.md`** | Copy the folders in `skills/` into the agent's skills folder. |
@@ -55,7 +55,7 @@ Plain English works too: *"Review my SPY calls from today"* and attach your expo
 
 ## Method
 
-Bar classification follows [TheStrat Suite](https://github.com/natebking/thestrat-suite) v3.1.x and its TheStratGrammar spec. Summary in [strat-primer.md](skills/strat-trade-review/references/strat-primer.md).
+Bar classification follows [TheStrat Suite](https://github.com/345-strategies/thestrat-suite) v3.1.x and its TheStratGrammar spec. Summary in [strat-primer.md](skills/strat-trade-review/references/strat-primer.md).
 
 ## Not advice
 

@@ -1,6 +1,6 @@
 # TheStrat primer for trade reviews
 
-Condensed from TheStrat Suite v3.1.x docs (`docs/concepts/*.md`) and `grammar/SPEC.md` in github.com/natebking/thestrat-suite. When this file and the Suite disagree, the Suite wins.
+Condensed from TheStrat Suite v3.1.x docs (`docs/concepts/*.md`) and `grammar/SPEC.md` in github.com/345-strategies/thestrat-suite. When this file and the Suite disagree, the Suite wins.
 
 ## Bar types
 

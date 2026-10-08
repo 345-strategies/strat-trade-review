@@ -32,11 +32,11 @@ Then go straight to Step 1 and ask only for what is still missing, usually the f
 
 ## Bundled files
 
-This skill ships with `scripts/strat_review.py`, `scripts/import_fills.py`, `scripts/share_post.py`, `scripts/render_html.py`, `templates/` (the share card designs), `references/` (strat-primer, data-sources, connect-and-import), `assets/journal-entry-template.md` and a worked example in `examples/`. If they are not next to this file, get them from github.com/natebking/strat-trade-review (the `skills/strat-trade-review/` folder).
+This skill ships with `scripts/strat_review.py`, `scripts/import_fills.py`, `scripts/share_post.py`, `scripts/render_html.py`, `templates/` (the share card designs), `references/` (strat-primer, data-sources, connect-and-import), `assets/journal-entry-template.md` and a worked example in `examples/`. If they are not next to this file, get them from github.com/345-strategies/strat-trade-review (the `skills/strat-trade-review/` folder).
 
 ## Conventions (do not drift from these)
 
-- **TheStrat grammar follows TheStrat Suite v3.1.x and its TheStratGrammar spec** (github.com/natebking/thestrat-suite). Summary in `references/strat-primer.md`. The rules that matter most: equal is not a break; `2u`/`2d` name the broken side, not the candle color; a `2u`/`2d` that closes back inside the prior range is a Failing 2 (`F2u` bearish, `F2d` bullish); a close exactly at the open counts as not above; Full Timeframe Continuity (FTFC) uses only close-vs-open of each forming bar.
+- **TheStrat grammar follows TheStrat Suite v3.1.x and its TheStratGrammar spec** (github.com/345-strategies/thestrat-suite). Summary in `references/strat-primer.md`. The rules that matter most: equal is not a break; `2u`/`2d` name the broken side, not the candle color; a `2u`/`2d` that closes back inside the prior range is a Failing 2 (`F2u` bearish, `F2d` bullish); a close exactly at the open counts as not above; Full Timeframe Continuity (FTFC) uses only close-vs-open of each forming bar.
 - **Green and red mean bull and bear, never good and bad.** Bar-type colors follow the Suite palette (2u `#4caf50`, 2d `#f23645`, 1u `#ffeb3b`, 1d `#ff9800`, 3u `#089981`, 3d `#e91e63`, F2d `#81c784`, F2u `#f77c80`). Charts draw plain candles by default (green close above open, red otherwise) with each bar's type labeled underneath; `--candles strat` colors them by bar type instead. Fill markers are neutral (blue buys, white sells). A P/L is never colored green or red for gain or loss.
 - **Times:** show the trader's local zone with ET in parentheses, e.g. `7:25 PT (10:25 ET)`. Default local zone is Pacific; change with `--display-tz`.
 - **Any Pine Script you produce is delivered as a `.txt` file.**
