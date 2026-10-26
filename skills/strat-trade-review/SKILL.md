@@ -145,13 +145,14 @@ Useful options:
 | `--min-target-r` | `1.0` | first target = nearest magnitude or reference level at least this many R from the trigger |
 | `--t1` | auto | override the first target |
 | `--trail-tf` | `60m` | runners trail under each completed bar of this timeframe (a 30m trail tends to stop out a 0DTE runner on normal pullbacks) |
+| `--htf-sessions` | `0` | prior sessions shown on the 30m and 60m panels of `timeframes_*.png`, for context before the trade day (needs those sessions in `--bars`) |
 | `--mark` | last bar | mark time for hold and runner rows (use the close once the day is done) |
 | `--caution-until` | off | entries before this ET time get `EARLY_SESSION`; set it only if waiting out the open is the trader's own rule |
 | `--session futures` | auto for futures symbols | 18:00 to 17:00 ET sessions; equities use 09:30 to 16:00 |
 | `--triggers-window` | `3` | hours either side of the entry to list triggers (0 = whole session) |
 | `--fetch yfinance --yf-symbol ES=F --interval 1m` | off | download underlying bars instead of `--bars` |
 
-It writes `review.md` (tables), `review.json` (same data for you to read), `timeframes_*.png` and `chart_*.png`. **`timeframes_*.png` is the main image to show the trader**: one panel each for 5m, 15m, 30m and 60m with every fill numbered (`#1`, `#2`...), the first trigger with the trade on each timeframe, the clean Strat entry and its C1 stop, and a table of the state on every timeframe at every fill. `chart_*.png` is the single-timeframe session view. Read `review.json` for exact values; do not re-derive them by hand.
+It writes `review.md` (tables), `review.json` (same data for you to read), `timeframes_*.png` and `chart_*.png`. **`timeframes_*.png` is the main image to show the trader**: one panel each for 5m, 15m, 30m and 60m with every fill numbered (`#1`, `#2`...), the first trigger with the trade on each timeframe, the clean Strat entry and its C1 stop, the Day magnitude in the trade's direction as a dashed line on every panel, and a table of the state on every timeframe at every fill. `chart_*.png` is the single-timeframe session view. Read `review.json` for exact values; do not re-derive them by hand.
 
 What it computes, so you can explain it:
 
