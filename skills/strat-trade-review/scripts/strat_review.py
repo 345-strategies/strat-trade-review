@@ -1177,7 +1177,8 @@ def run(args):
                 cost = sum(abs(pos.net(f)) for f in entries)
                 extra = (pos.direction + (f"  ·  {actual / cost:+.0%} on premium paid"
                                           if cost and inst.asset != "future" else ""))   # no dollars on shared images
-                mtf_chart(mpath, bars, sess, s0, pos, fill_states, all_events, clean, clock, tfs, ctx_tfs, extra)
+                mtf_chart(mpath, bars, sess, s0, pos, fill_states, all_events, clean, clock, tfs, ctx_tfs, extra,
+                          args.htf_sessions)
                 report["positions"][-1]["timeframes_chart"] = mpath.name
             # the same view as data, for the HTML templates (share_post.py renders them)
             dpath = out / f"timeframes_{pi}_{re.sub(r'[^A-Za-z0-9]+', '_', inst.label())}.json"
@@ -1304,7 +1305,8 @@ def chart(path, sbars, pos, levels, clean, clock, sess, chart_tf, all_bars, dail
     plt.close(fig)
 
 
-def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs, ctx_tfs, title_extra=""):
+def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs, ctx_tfs, title_extra="",
+              htf_sessions=0):
     """One image: a panel per timeframe (5m, 15m, 30m, 60m by default) with every fill numbered on it,
     the triggers near the trade, the clean Strat entry and its C1 stop, and a table of the state on
     each timeframe at each fill. Plain candles (green bull, red bear) with the bar type underneath."""
@@ -1319,6 +1321,8 @@ def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs,
     fills = [f for f, _, _ in fill_states]
     first_t, last_t = fills[0].time, fills[-1].time
     rows = len(fill_states)
+    # the Day's magnitude in the trade's direction, drawn on every panel as the higher-timeframe target
+    day_ev = next((e for e in events if e["tf"] == "D" and e["dir"] == pos.direction and e.get("magnitude")), None)
     fig = plt.figure(figsize=(16, 10.5 + 0.32 * max(0, rows - 4)), dpi=110)
     fig.patch.set_facecolor(BG)
     gs = GridSpec(3, 2, figure=fig, height_ratios=[1, 1, 0.3 + 0.08 * rows], hspace=0.3, wspace=0.12,
@@ -1338,15 +1342,21 @@ def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs,
         if idx0 is None:
             continue
         sb = [b for b in agg if sess.start_of(b.start) == s0]
-        prev0 = agg[idx0 - 1] if idx0 > 0 else None
         step = timedelta(minutes=TF_MIN[tf])
         lo_t, hi_t = sb[0].start, sb[-1].start + step
         if len(sb) > 40:   # zoom the fast timeframe to the trade
             lo_t = max(lo_t, first_t - 12 * step)
             hi_t = min(hi_t, last_t + 18 * step)
-        view = [(i, b) for i, b in enumerate(sb) if lo_t <= b.start < hi_t]
+        elif htf_sessions and TF_MIN[tf] >= 30:   # 30m and slower: show the prior sessions too
+            starts = sorted({sess.start_of(b.start) for b in agg[:idx0]})
+            if starts:
+                keep = starts[-htf_sessions:]
+                lo_t = next(b.start for b in agg if sess.start_of(b.start) == keep[0])
+        view = [(i, b) for i, b in enumerate(agg) if lo_t <= b.start < hi_t]
         for j, (i, b) in enumerate(view):
-            prev = sb[i - 1] if i > 0 else prev0
+            prev = agg[i - 1] if i > 0 else None
+            if j and sess.start_of(b.start) != sess.start_of(view[j - 1][1].start):
+                ax.axvline(j - 0.5, color=GRID, linewidth=1, linestyle=":")
             col = BULL_C if above_open(b) else BEAR_C
             ax.vlines(j, b.low, b.high, color=col, linewidth=1)
             ax.add_patch(plt.Rectangle((j - 0.33, min(b.open, b.close)), 0.66,
@@ -1355,6 +1365,10 @@ def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs,
             kind = kind.rstrip("ud") if kind[0] in "13" else kind
             ax.annotate(kind, (j, b.low), textcoords="offset points", xytext=(0, -9), ha="center",
                         color=MUTED, fontsize=6.5)
+
+        def lab_at(j, y):
+            """Label anchor: just left of where a level starts when earlier bars leave room, else the right edge."""
+            return ((j - 0.6, y), "right") if j >= 10 else ((len(view) - 0.5, y), "right")
 
         def x_of(t):
             for j, (i, b) in enumerate(view):
@@ -1373,9 +1387,10 @@ def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs,
                 if j is not None:
                     c = BULL_C if e["dir"] == "BULL" else BEAR_C
                     ax.hlines(e["trigger"], j - 0.45, len(view) - 0.5, color=c, linewidth=1.2, alpha=0.9)
+                    xy, ha = lab_at(j, e["trigger"])
                     ax.annotate(f"{tf} trigger {e['combo']} {e['trigger']:.2f}, "
-                                f"{clock.fmt(e['time']).split(' (')[0]}", (len(view) - 0.5, e["trigger"]),
-                                textcoords="offset points", xytext=(-2, 4), ha="right", color=c, fontsize=8)
+                                f"{clock.fmt(e['time']).split(' (')[0]}", xy,
+                                textcoords="offset points", xytext=(-2, 4), ha=ha, color=c, fontsize=8)
         if clean and clean["event"]["tf"] == tf:
             e = clean["event"]
             j = x_of(e["time"])
@@ -1383,11 +1398,20 @@ def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs,
                 c = BULL_C if e["dir"] == "BULL" else BEAR_C
                 ax.hlines(e["trigger"], j - 0.45, len(view) - 0.5, color=c, linewidth=1.8)
                 ax.hlines(e["stop_c1"], j - 1.45, len(view) - 0.5, color=MUTED, linewidth=1, linestyle="--")
+                xy, ha = lab_at(j, e["trigger"])
                 ax.annotate(f"Strat entry: {e['combo']} {e['trigger']:.2f}, {clock.fmt(e['time']).split(' (')[0]}",
-                            (len(view) - 0.5, e["trigger"]), textcoords="offset points", xytext=(-2, 4),
-                            ha="right", color=c, fontsize=8, weight="bold")
-                ax.annotate(f"C1 stop {e['stop_c1']:.2f}", (len(view) - 0.5, e["stop_c1"]),
-                            textcoords="offset points", xytext=(-2, -10), ha="right", color=MUTED, fontsize=7.5)
+                            xy, textcoords="offset points", xytext=(-2, 4),
+                            ha=ha, color=c, fontsize=8, weight="bold")
+                xy, ha = lab_at(j - 1, e["stop_c1"])
+                ax.annotate(f"C1 stop {e['stop_c1']:.2f}", xy,
+                            textcoords="offset points", xytext=(-2, -10), ha=ha, color=MUTED, fontsize=7.5)
+
+        if day_ev:
+            c = BULL_C if day_ev["dir"] == "BULL" else BEAR_C
+            ax.axhline(day_ev["magnitude"], color=c, linewidth=1.2, linestyle=(0, (6, 3)), alpha=0.9)
+            ax.annotate(f"Day magnitude {day_ev['magnitude']:.2f} (D {day_ev['combo']})",
+                        (0, day_ev["magnitude"]), textcoords="offset points", xytext=(0, 4), ha="left",
+                        color=c, fontsize=8, weight="bold")
 
         groups: dict = {}
         for n, f in enumerate(fills, 1):   # one marker per bar and side, numbered by fill order
@@ -1412,7 +1436,9 @@ def mtf_chart(path, bars, sess, s0, pos, fill_states, events, clean, clock, tfs,
         n_ticks = 6
         stp = max(1, len(view) // n_ticks)
         ax.set_xticks(range(0, len(view), stp))
-        ax.set_xticklabels([clock.fmt(view[j][1].start).split(" (")[0] for j in range(0, len(view), stp)],
+        multi = sess.start_of(view[0][1].start) != sess.start_of(view[-1][1].start)
+        ax.set_xticklabels([(f"{view[j][1].start.astimezone(clock.tz):%a} " if multi else "")
+                            + clock.fmt(view[j][1].start).split(" (")[0] for j in range(0, len(view), stp)],
                            fontsize=7.5, color=MUTED)
         ax.tick_params(axis="y", colors=MUTED, labelsize=7.5)
         ax.set_xlim(-1, len(view))
@@ -1540,6 +1566,8 @@ def main(argv=None):
     ap.add_argument("--entry-tf", default="30m", help="Timeframe whose trigger defines the clean Strat entry")
     ap.add_argument("--clean-entry", help="Pin the clean entry to the first --entry-tf trigger at/after this time")
     ap.add_argument("--t1", type=float, help="Override first target (underlying price)")
+    ap.add_argument("--htf-sessions", type=int, default=0,
+                    help="Prior sessions to show on the slower timeframe panels (30m, 60m) of the timeframes image")
     ap.add_argument("--mark", help="Mark time for hold/runner rows (default: last bar of session)")
     ap.add_argument("--or-minutes", type=int, default=30, help="Opening range length in minutes")
     ap.add_argument("--runner-fraction", type=float, default=0.25)
